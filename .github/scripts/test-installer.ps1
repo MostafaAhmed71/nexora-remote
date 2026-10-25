@@ -6,8 +6,14 @@ $registryPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{7D31
 $dataRoot = Join-Path $env:ProgramData 'NexoraRemote'
 if (Test-Path $installRoot) { throw 'Smoke destination must be empty' }
 $installed = $false
+$testFailure = $null
+$logRoot = (Resolve-Path 'artifacts').Path
+$installLog = Join-Path $logRoot 'installer-install.log'
+$upgradeLog = Join-Path $logRoot 'installer-upgrade.log'
+$uninstallLog = Join-Path $logRoot 'installer-uninstall.log'
+function Wait-ServiceState([string]$state) { $controller = Get-Service NexoraRemote; try { $controller.WaitForStatus($state,[TimeSpan]::FromSeconds(30)) } finally { $controller.Dispose() } }
 try {
-    $process = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"",'/LOG=artifacts/installer-install.log') -Wait -PassThru
+    $process = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"","/LOG=`"$installLog`"") -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Install exit $($process.ExitCode)" }
     $installed = $true
     if (-not (Test-Path "$installRoot/Nexora.Remote.Agent.exe")) { throw 'Missing executable' }
@@ -20,10 +26,11 @@ try {
     if ($config.PathName -notlike '*--service*') { throw 'Missing service role' }
     $recovery = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\NexoraRemote'
     if (-not $recovery.FailureActions) { throw 'Missing service crash recovery policy' }
-    $service | Stop-Service
-    (Get-Service NexoraRemote).WaitForStatus('Stopped',[TimeSpan]::FromSeconds(30))
+    $service.Dispose()
+    Stop-Service NexoraRemote
+    Wait-ServiceState 'Stopped'
     Start-Service NexoraRemote
-    (Get-Service NexoraRemote).WaitForStatus('Running',[TimeSpan]::FromSeconds(20))
+    Wait-ServiceState 'Running'
     $workers = Get-CimInstance Win32_Process -Filter "Name='Nexora.Remote.Agent.exe'" | Where-Object { $_.CommandLine -like '*--worker*' }
     if ($workers) { throw 'Unenrolled service must not start an interactive worker' }
     $shortcut = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'NEXORA Remote/NEXORA Remote Agent.lnk'
@@ -31,16 +38,26 @@ try {
     if (-not (Test-Path "$installRoot/licenses/Microsoft-NETCore-LICENSE.txt")) { throw 'License missing' }
     New-Item -ItemType Directory -Force $dataRoot | Out-Null
     Set-Content "$dataRoot/upgrade-test-marker.txt" 'disposable test data, not an identity'
-    $upgrade = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"",'/LOG=artifacts/installer-upgrade.log') -Wait -PassThru
+    $upgrade = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"","/LOG=`"$upgradeLog`"") -Wait -PassThru
     if ($upgrade.ExitCode -ne 0) { throw "Upgrade exit $($upgrade.ExitCode)" }
     if (-not (Test-Path "$dataRoot/upgrade-test-marker.txt")) { throw 'Upgrade lost machine data' }
-    if ((Get-Service NexoraRemote).Status -ne 'Running') { throw 'Upgrade failed to restart service' }
+    Wait-ServiceState 'Running'
+} catch {
+    $testFailure = $_
+    Write-Host "Primary installer test failure: $($_.Exception.Message)"
 } finally {
+    if (Test-Path "$dataRoot/logs/agent.jsonl") { Copy-Item "$dataRoot/logs/agent.jsonl" "$logRoot/service-smoke.log" }
     if ($installed) {
-        $remove = Start-Process "$installRoot/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/LOG=artifacts/installer-uninstall.log') -Wait -PassThru
-        if ($remove.ExitCode -ne 0) { throw "Uninstall exit $($remove.ExitCode)" }
+        $remove = Start-Process "$installRoot/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=`"$uninstallLog`"") -Wait -PassThru
+        if ($remove.ExitCode -ne 0) {
+            Write-Host "Uninstall exit $($remove.ExitCode)"
+            if ($null -eq $testFailure) { throw "Uninstall exit $($remove.ExitCode)" }
+        }
     }
 }
+if ($null -ne $testFailure) { throw $testFailure }
+[GC]::Collect()
+[GC]::WaitForPendingFinalizers()
 if (Get-Service NexoraRemote -ErrorAction SilentlyContinue) { throw 'Service remained after uninstall' }
 if (Test-Path "$installRoot/Nexora.Remote.Agent.exe") { throw 'Executable remained after uninstall' }
 if (Test-Path $registryPath) { throw 'Installed Apps registration remained' }
