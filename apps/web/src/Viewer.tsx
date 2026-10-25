@@ -57,7 +57,7 @@ export function Viewer({
       timer: ReturnType<typeof setTimeout> | undefined;
     intentional.current = false;
     let drawing = false;
-    const started = Date.now();
+    let started = Date.now();
     const durationTimer = setInterval(
       () => setDuration(Math.floor((Date.now() - started) / 1000)),
       1000,
@@ -114,6 +114,7 @@ export function Viewer({
             try {
               const m = JSON.parse(e.data);
               if (m.type === "ready") {
+                started = Date.now();
                 ready.current = true;
                 setConnected(true);
                 seq.current = 0;
@@ -246,11 +247,13 @@ export function Viewer({
           <p role="status">{status}</p>
         </div>
         <span>
-          {metrics.fps.toFixed(1)} FPS · {metrics.kbps.toFixed(0)} kbps ·{" "}
-          {metrics.mb.toFixed(2)} MB ·{" "}
+          {connected && totals.current.frames > 0
+            ? `${metrics.fps.toFixed(1)} FPS · ${metrics.kbps.toFixed(0)} kbps · ${metrics.mb.toFixed(2)} MB`
+            : "FPS واستهلاك البيانات غير مقاس"}{" "}
+          ·{" "}
           {rtt === null || !connected ? "RTT غير مقاس" : rtt + " ms RTT للخادم"}{" "}
           · {size} · {duration} ث · {mode === "view" ? "مشاهدة فقط" : "تحكم"}
-          {agentTiming
+          {agentTiming && connected
             ? ` · التقاط ${agentTiming.capture.toFixed(1)} ms · ترميز ${agentTiming.encode.toFixed(1)} ms`
             : " · توقيت Agent غير مقاس"}
         </span>

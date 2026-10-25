@@ -589,7 +589,44 @@ describe("device enrollment and authorization", () => {
     }
   });
   it("revokes device trust and rejects fresh proof", async () => {
-    expect((await call("/devices/" + deviceId, "DELETE")).statusCode).toBe(200);
+    expect(
+      (await call("/devices/" + deviceId, "DELETE", undefined, a, techCookie))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await call("/devices/" + deviceId + "/acl", "PUT", {
+          enforced: true,
+          entries: [{ userId: tech, permission: "devices" }],
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          "/devices/" + deviceId,
+          "PATCH",
+          { name: "Managed by explicit ACL", groupId: null },
+          a,
+          techCookie,
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          "/devices/" + deviceId + "/acl",
+          "PUT",
+          { enforced: false, entries: [] },
+          a,
+          techCookie,
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (await call("/devices/" + deviceId, "DELETE", undefined, a, techCookie))
+        .statusCode,
+    ).toBe(200);
     const n = (await call("/agent/challenge", "POST", { deviceId })).json()
       .nonce;
     const signature = createSign("SHA256")

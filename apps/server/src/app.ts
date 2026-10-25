@@ -577,12 +577,21 @@ export async function createApp(o: Options) {
     };
   });
   app.patch("/api/devices/:id", async (req) => {
-    const { org, u } = await scope(req, "devices");
+    const { org, u } = await scope(req, "device-manage");
     const id = uuid.parse((req.params as any).id);
     const b = z
       .object({ name: z.string().min(1).max(120), groupId: uuid.nullable() })
       .parse(req.body);
     return o.run(org, async (db) => {
+      if (
+        !(await one(db, "SELECT id FROM devices WHERE org_id=$1 AND id=$2", [
+          org,
+          id,
+        ]))
+      )
+        throw fail(404, "Device not found");
+      if (!(await deviceAllowed(db, org, id, u.id, "devices")))
+        throw fail(403, "Device management ACL denied");
       if (
         b.groupId &&
         !(await one(
@@ -787,7 +796,7 @@ export async function createApp(o: Options) {
     },
   );
   app.delete("/api/devices/:id", async (req) => {
-    const { org, u } = await scope(req, "devices");
+    const { org, u } = await scope(req, "device-manage");
     const id = uuid.parse((req.params as any).id);
     return o.run(org, async (db) => {
       if (
