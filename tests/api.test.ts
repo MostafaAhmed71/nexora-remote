@@ -67,7 +67,14 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(
     (await readFile("packages/database/migrations/001_initial.sql", "utf8")) +
-      (await readFile("packages/database/migrations/002_security.sql", "utf8")),
+      (await readFile(
+        "packages/database/migrations/002_security.sql",
+        "utf8",
+      )) +
+      (await readFile(
+        "packages/database/migrations/003_device_operations.sql",
+        "utf8",
+      )),
   );
   await db.exec(
     "CREATE ROLE nexora_app; GRANT USAGE ON SCHEMA public TO nexora_app; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO nexora_app; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO nexora_app;",
@@ -347,6 +354,11 @@ describe("device enrollment and authorization", () => {
     const auth = await call("/sessions", "POST", { deviceId, mode: "control" });
     expect(auth.statusCode).toBe(200);
     const sid = auth.json().id;
+    const attempts = await Promise.all([
+      call("/sessions", "POST", { deviceId, mode: "control" }),
+      call("/sessions", "POST", { deviceId, mode: "view" }),
+    ]);
+    expect(attempts.map((x) => x.statusCode)).toEqual([409, 409]);
     expect(auth.json().expiresAt).toBeLessThanOrEqual(Date.now() + 121000);
     await db.query(
       "UPDATE auth_sessions SET expires_at=now()+interval '8 hours' WHERE id_hash=$1",
@@ -390,6 +402,20 @@ describe("device enrollment and authorization", () => {
     const received = once(viewerWs, "message");
     agent.send(Buffer.concat([Buffer.from(sid), frame]));
     expect(Buffer.from((await received)[0])).toEqual(frame);
+    viewerWs.send(JSON.stringify({ type: "stream", acks: true }));
+    const pong = once(viewerWs, "message");
+    viewerWs.send(JSON.stringify({ type: "ping", sentAt: 1 }));
+    await pong;
+    const oneFrame = once(viewerWs, "message");
+    agent.send(Buffer.concat([Buffer.from(sid), frame]));
+    await oneFrame;
+    const pressure = once(agent, "message");
+    agent.send(Buffer.concat([Buffer.from(sid), frame]));
+    expect(JSON.parse((await pressure)[0].toString()).congested).toBe(true);
+    const feedback = once(agent, "message");
+    viewerWs.send(JSON.stringify({ type: "frameAck" }));
+    expect(JSON.parse((await feedback)[0].toString()).type).toBe("flow");
+
     const input = once(agent, "message");
     viewerWs.send(
       JSON.stringify({ kind: "key", code: 65, down: true, seq: 1 }),

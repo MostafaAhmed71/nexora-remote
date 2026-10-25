@@ -1,13 +1,13 @@
 [Setup]
 AppId={{7D311E70-72E1-4C69-BD13-EE690C930E98}
 AppName=NEXORA Remote Agent
-AppVersion=0.2.0
+AppVersion=0.3.0
 AppPublisher=NEXORA
 DefaultDirName={autopf}\NexoraRemote
 UsePreviousAppDir=no
 DefaultGroupName=NEXORA Remote
 OutputDir=..\..\..\artifacts
-OutputBaseFilename=NexoraRemote-0.2.0-win-x64-unsigned
+OutputBaseFilename=NexoraRemote-0.3.0-win-x64-unsigned
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible

@@ -27,6 +27,23 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with: { name: web-server-build, path: dist, retention-days: 14 }
+  netem:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: bash .github/scripts/test-netem.sh
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: always()
+        with:
+          {
+            name: netem-network-evidence,
+            path: artifacts/netem-*,
+            retention-days: 14,
+          }
   postgres:
     runs-on: ubuntu-24.04
     services:
@@ -100,12 +117,25 @@ jobs:
             path: artifacts/windows-validation.json,
             retention-days: 14,
           }
+      - name: Checkout immutable 0.2.0 upgrade baseline
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: 7072a40efe11f47b016248a217b3a3e743ed4aeb
+          path: upgrade-baseline
+      - name: Build old 0.2.0 Agent for real upgrade
+        run: dotnet publish upgrade-baseline/apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o upgrade-baseline/artifacts/agent
       - run: dotnet publish apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/agent
       - shell: pwsh
         run: Copy-Item -Recurse docs/licenses artifacts/agent/licenses
       - run: choco install innosetup --no-progress -y
       - shell: pwsh
         run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" apps/windows-agent/installer/Nexora.iss'
+      - name: Build immutable 0.2 installer
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse docs/licenses upgrade-baseline/artifacts/agent/licenses
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" upgrade-baseline/apps/windows-agent/installer/Nexora.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline installer failed' }
       - name: Verify visible install and clean uninstall without launching Agent
         shell: pwsh
         run: ./.github/scripts/test-installer.ps1

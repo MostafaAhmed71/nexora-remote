@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { StreamGate } from "./stream-gate.js";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import helmet from "@fastify/helmet";
@@ -72,12 +73,13 @@ export async function createApp(o: Options) {
     },
   });
   await app.register(swagger, {
-    openapi: { info: { title: "NEXORA Remote API", version: "0.1.0" } },
+    openapi: { info: { title: "NEXORA Remote API", version: "0.3.0" } },
   });
   await app.register(swaggerUI, { routePrefix: "/api/docs" });
   const agents = new Map<string, WebSocket>();
   const interactive = new Map<string, boolean>();
   const viewers = new Map<string, WebSocket>();
+  const streamGates = new Map<string, StreamGate>();
   const sessionDevices = new Map<string, string>();
   const challenges = new Map<string, { device: string; expires: number }>();
   const tickets = new Map<
@@ -93,6 +95,7 @@ export async function createApp(o: Options) {
   const closeSession = (s: string) => {
     viewers.get(s)?.close(1000, "Session ended");
     viewers.delete(s);
+    streamGates.delete(s);
     const device = sessionDevices.get(s);
     const agent = device ? agents.get(device) : undefined;
     if (agent?.readyState === 1)
@@ -355,14 +358,18 @@ export async function createApp(o: Options) {
       )
         throw fail(403, "Password and MFA required");
       const codes = Array.from({ length: 10 }, () => token().slice(0, 24));
-      await o.db.query("DELETE FROM mfa_recovery_codes WHERE user_id=$1", [
-        u.id,
-      ]);
-      for (const code of codes)
-        await o.db.query(
-          "INSERT INTO mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)",
-          [u.id, digest(code)],
-        );
+      // Global auth tables, serialized by the user row inside one transaction.
+      await o.run(u.id, async (db) => {
+        await db.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [u.id]);
+        await db.query("DELETE FROM mfa_recovery_codes WHERE user_id=$1", [
+          u.id,
+        ]);
+        for (const code of codes)
+          await db.query(
+            "INSERT INTO mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)",
+            [u.id, digest(code)],
+          );
+      });
       return { codes };
     },
   );
@@ -389,7 +396,14 @@ export async function createApp(o: Options) {
           .array(
             z.object({
               userId: uuid,
-              permission: z.enum(["view", "control", "clipboard", "files"]),
+              permission: z.enum([
+                "view",
+                "control",
+                "terminate",
+                "devices",
+                "clipboard",
+                "files",
+              ]),
             }),
           )
           .max(200),
@@ -776,6 +790,15 @@ export async function createApp(o: Options) {
     const { org, u } = await scope(req, "devices");
     const id = uuid.parse((req.params as any).id);
     return o.run(org, async (db) => {
+      if (
+        !(await one(db, "SELECT id FROM devices WHERE org_id=$1 AND id=$2", [
+          org,
+          id,
+        ]))
+      )
+        throw fail(404, "Device not found");
+      if (!(await deviceAllowed(db, org, id, u.id, "devices")))
+        throw fail(403, "Device management ACL denied");
       const d = await one(
         db,
         "UPDATE devices SET revoked_at=now() WHERE org_id=$1 AND id=$2 RETURNING id",
@@ -901,11 +924,15 @@ export async function createApp(o: Options) {
     return o.run(org, async (db) => {
       const own = await one(
         db,
-        "SELECT user_id FROM remote_sessions WHERE org_id=$1 AND id=$2",
+        "SELECT user_id,device_id FROM remote_sessions WHERE org_id=$1 AND id=$2",
         [org, id],
       );
       if (!own) throw fail(404, "Session not found");
-      if (own.user_id !== u.id && !allowed(role, "terminate"))
+      if (
+        own.user_id !== u.id &&
+        (!allowed(role, "terminate") ||
+          !(await deviceAllowed(db, org, own.device_id, u.id, "terminate")))
+      )
         throw fail(403, "Permission denied");
       const s = await one(
         db,
@@ -1021,7 +1048,8 @@ export async function createApp(o: Options) {
           ws.close(1008);
           return;
         }
-        if (agents.has(id)) {
+        {
+          // Also invalidate persisted grants after a backend process restart.
           const ended = await o.run(org, (db) =>
             db.query(
               "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
@@ -1098,9 +1126,21 @@ export async function createApp(o: Options) {
             const viewer = viewers.get(sid);
             if (
               viewer?.readyState === 1 &&
-              viewer.bufferedAmount < MAX_FRAME_BYTES
+              streamGates
+                .get(sid)
+                ?.allow(viewer.bufferedAmount, bytes.length, Date.now())
             )
               viewer.send(bytes.subarray(36), { binary: true });
+            else if (viewer?.readyState === 1) {
+              ws.send(
+                JSON.stringify({
+                  type: "flow",
+                  sessionId: sid,
+                  congested: true,
+                }),
+              );
+              if (streamGates.get(sid)?.stalled(Date.now())) closeSession(sid);
+            }
           })()
             .catch(() => ws.close(1011))
             .finally(() => {
@@ -1131,6 +1171,8 @@ export async function createApp(o: Options) {
         }
         viewers.get(id)?.close(1000, "Replaced");
         viewers.set(id, ws);
+        const gate = new StreamGate();
+        streamGates.set(id, gate);
         sessionDevices.set(id, s.device_id);
         await o.run(org, (db) =>
           db.query(
@@ -1170,6 +1212,22 @@ export async function createApp(o: Options) {
                 ws.send(
                   JSON.stringify({ type: "pong", sentAt: message.sentAt }),
                 );
+                return;
+              }
+              if (message.type === "stream" && message.acks === true) {
+                gate.acknowledged = true;
+                return;
+              }
+              if (message.type === "frameAck") {
+                const elapsed = gate.ack(Date.now());
+                if (elapsed !== null)
+                  agents.get(s.device_id)?.send(
+                    JSON.stringify({
+                      type: "flow",
+                      sessionId: id,
+                      congested: elapsed > 250,
+                    }),
+                  );
                 return;
               }
               if (message.type === "quality") {

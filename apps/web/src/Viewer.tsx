@@ -31,6 +31,12 @@ export function Viewer({
     [rtt, setRtt] = useState<number | null>(null),
     [size, setSize] = useState(""),
     [fit, setFit] = useState(true),
+    [zoom, setZoom] = useState(100),
+    [duration, setDuration] = useState(0),
+    [agentTiming, setAgentTiming] = useState<{
+      capture: number;
+      encode: number;
+    } | null>(null),
     [preset, setPreset] = useState<keyof typeof presets>("balanced"),
     [monitor, setMonitor] = useState(0),
     [retry, setRetry] = useState(0),
@@ -51,6 +57,11 @@ export function Viewer({
       timer: ReturnType<typeof setTimeout> | undefined;
     intentional.current = false;
     let drawing = false;
+    const started = Date.now();
+    const durationTimer = setInterval(
+      () => setDuration(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
     async function connect() {
       try {
         setError("");
@@ -106,6 +117,9 @@ export function Viewer({
                 ready.current = true;
                 setConnected(true);
                 seq.current = 0;
+                setRtt(null);
+                setAgentTiming(null);
+                ws.send(JSON.stringify({ type: "stream", acks: true }));
                 setStatus("جلسة مصرح بها • تنتهي تلقائيًا خلال ٥ دقائق");
                 ws.send(
                   JSON.stringify({
@@ -116,6 +130,16 @@ export function Viewer({
               }
               if (m.type === "pong")
                 setRtt(Math.max(0, Math.round(performance.now() - m.sentAt)));
+              if (
+                m.type === "health" &&
+                m.timing &&
+                Number.isFinite(m.timing.CaptureMs) &&
+                Number.isFinite(m.timing.EncodeMs)
+              )
+                setAgentTiming({
+                  capture: m.timing.CaptureMs,
+                  encode: m.timing.EncodeMs,
+                });
               if (m.type === "health" && !m.interactive)
                 setStatus("لا توجد جلسة مستخدم تفاعلية قابلة للتحكم");
             } catch {
@@ -150,6 +174,8 @@ export function Viewer({
             setError("تعذر فك إطار الشاشة");
           } finally {
             drawing = false;
+            if (socket.current === ws && ws.readyState === WebSocket.OPEN)
+              ws.send(JSON.stringify({ type: "frameAck" }));
           }
         };
       } catch (e) {
@@ -171,6 +197,7 @@ export function Viewer({
       stopped = true;
       ready.current = false;
       clearTimeout(timer);
+      clearInterval(durationTimer);
       socket.current?.close();
       socket.current = null;
     };
@@ -221,7 +248,11 @@ export function Viewer({
         <span>
           {metrics.fps.toFixed(1)} FPS · {metrics.kbps.toFixed(0)} kbps ·{" "}
           {metrics.mb.toFixed(2)} MB ·{" "}
-          {rtt === null ? "RTT غير مقاس" : rtt + " ms RTT للخادم"} · {size}
+          {rtt === null || !connected ? "RTT غير مقاس" : rtt + " ms RTT للخادم"}{" "}
+          · {size} · {duration} ث · {mode === "view" ? "مشاهدة فقط" : "تحكم"}
+          {agentTiming
+            ? ` · التقاط ${agentTiming.capture.toFixed(1)} ms · ترميز ${agentTiming.encode.toFixed(1)} ms`
+            : " · توقيت Agent غير مقاس"}
         </span>
         <button
           onClick={() => {
@@ -254,6 +285,21 @@ export function Viewer({
         <button onClick={() => setFit(!fit)}>
           {fit ? "حجم الإطار الأصلي" : "ملاءمة الشاشة"}
         </button>
+        <label>
+          تكبير {zoom}%
+          <input
+            aria-label="تكبير"
+            type="range"
+            min="50"
+            max="200"
+            step="25"
+            value={zoom}
+            onChange={(e) => {
+              setZoom(Number(e.target.value));
+              setFit(false);
+            }}
+          />
+        </label>
         <label>
           الجودة
           <select
@@ -307,6 +353,7 @@ export function Viewer({
         <canvas
           ref={canvas}
           className={fit ? "fit" : "actual"}
+          style={fit ? undefined : { width: `${zoom}%`, maxWidth: "none" }}
           tabIndex={0}
           aria-label="سطح المكتب البعيد"
           onBlur={() => send({ kind: "release" })}

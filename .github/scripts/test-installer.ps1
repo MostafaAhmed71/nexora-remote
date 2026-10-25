@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$installer = (Get-Item 'artifacts/NexoraRemote-0.2.0-win-x64-unsigned.exe').FullName
+$installer = (Get-Item 'artifacts/NexoraRemote-0.3.0-win-x64-unsigned.exe').FullName
+$baseline = (Get-Item 'upgrade-baseline/artifacts/NexoraRemote-0.2.0-win-x64-unsigned.exe').FullName
 $installRoot = Join-Path $env:ProgramFiles 'NexoraRemoteSmoke'
 $registryPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{7D311E70-72E1-4C69-BD13-EE690C930E98}_is1'
 $dataRoot = Join-Path $env:ProgramData 'NexoraRemote'
@@ -13,7 +14,7 @@ $upgradeLog = Join-Path $logRoot 'installer-upgrade.log'
 $uninstallLog = Join-Path $logRoot 'installer-uninstall.log'
 function Wait-ServiceState([string]$state) { $controller = Get-Service NexoraRemote; try { $controller.WaitForStatus($state,[TimeSpan]::FromSeconds(30)) } finally { $controller.Dispose() } }
 try {
-    $process = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"","/LOG=`"$installLog`"") -Wait -PassThru
+    $process = Start-Process $baseline -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"","/LOG=`"$installLog`"") -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Install exit $($process.ExitCode)" }
     $installed = $true
     if (-not (Test-Path "$installRoot/Nexora.Remote.Agent.exe")) { throw 'Missing executable' }
@@ -42,6 +43,8 @@ try {
     if ($upgrade.ExitCode -ne 0) { throw "Upgrade exit $($upgrade.ExitCode)" }
     if (-not (Test-Path "$dataRoot/upgrade-test-marker.txt")) { throw 'Upgrade lost machine data' }
     Wait-ServiceState 'Running'
+    if ((Get-ItemProperty $registryPath).DisplayVersion -ne '0.3.0') { throw 'Upgrade version mismatch' }
+    if ((Get-Item "$installRoot/Nexora.Remote.Agent.exe").VersionInfo.ProductVersion -notlike '0.3.0*') { throw 'Executable not upgraded' }
 } catch {
     $testFailure = $_
     Write-Host "Primary installer test failure: $($_.Exception.Message)"
@@ -62,5 +65,5 @@ if (Get-Service NexoraRemote -ErrorAction SilentlyContinue) { throw 'Service rem
 if (Test-Path "$installRoot/Nexora.Remote.Agent.exe") { throw 'Executable remained after uninstall' }
 if (Test-Path $registryPath) { throw 'Installed Apps registration remained' }
 if (Test-Path "$dataRoot/upgrade-test-marker.txt") { throw 'Machine data remained after clean uninstall' }
-@{ installed=$true; automaticService=$true; serviceStartStop=$true; upgradePreservesMachineData=$true; uninstalled=$true; remoteDesktopTested=$false } | ConvertTo-Json | Set-Content 'artifacts/installer-smoke.json'
+@{ installed=$true; automaticService=$true; serviceStartStop=$true; upgradePreservesMachineData=$true; upgradeFrom='0.2.0'; upgradeTo='0.3.0'; rollbackValidated=$false; uninstalled=$true; remoteDesktopTested=$false } | ConvertTo-Json | Set-Content 'artifacts/installer-smoke.json'
 Write-Host 'Machine service install/start/stop/restart/upgrade/uninstall checks passed.'

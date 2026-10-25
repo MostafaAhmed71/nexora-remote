@@ -78,6 +78,10 @@ export function DeviceAclEditor() {
           >
             <option value="view">مشاهدة</option>
             <option value="control">تحكم</option>
+            <option value="terminate">
+              إنهاء جلسات الآخرين (ضمن صلاحية الدور)
+            </option>
+            <option value="devices">إدارة الجهاز (ضمن صلاحية الدور)</option>
           </select>
           <button
             disabled={!user}
