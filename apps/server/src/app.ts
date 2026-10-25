@@ -940,15 +940,13 @@ export async function createApp(o: Options) {
                 return;
               }
               seq = e.data.seq;
-              agents
-                .get(s.device_id)
-                ?.send(
-                  JSON.stringify({
-                    type: "input",
-                    sessionId: id,
-                    event: e.data,
-                  }),
-                );
+              agents.get(s.device_id)?.send(
+                JSON.stringify({
+                  type: "input",
+                  sessionId: id,
+                  event: e.data,
+                }),
+              );
             })
             .catch(() => ws.close(1008))
             .finally(() => {
