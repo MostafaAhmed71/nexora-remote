@@ -22,7 +22,7 @@ Node 24, npm lockfile, PostgreSQL 17, .NET 10 SDK for cross compilation; Windows
 - `npm run lint`: Prettier formatting and source hygiene/merge-marker/private-key-pattern checks; not a comprehensive secret scanner/SAST product.
 - `npm run typecheck`, `npm test`, `npm run build`.
 - `npm run test:e2e`: starts isolated in-memory PostgreSQL WASM and real Fastify harness on loopback:3000, Vite on loopback:5173; contains only example.test fixture accounts.
-- `node --import tsx tests/postgres.integration.ts`: explicit `TEST_DATABASE_URL` to a disposable PostgreSQL server. Wraps DDL/fixtures in a rollback and exercises RLS under NOSUPERUSER/NOBYPASSRLS. CI is configured, not run on GitHub.
+- `node --import tsx tests/postgres.integration.ts`: explicit `TEST_DATABASE_URL` to a disposable PostgreSQL server. Wraps DDL/fixtures in a rollback and exercises RLS under NOSUPERUSER/NOBYPASSRLS. The native PostgreSQL 17 checks passed on GitHub Actions run 40180726012.
 - `dotnet build apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release`.
 - `dotnet run --project tests/agent-contract/Agent.Contract.csproj -c Release`.
 - `dotnet publish apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/agent`.

@@ -12,7 +12,7 @@ Trusted: application server, PostgreSQL operator, organization operators authori
 
 - Independent review, penetration testing, operational incident response and restore drill.
 - Windows interactive capture/input verification, locked-desktop race tests, keyboard layout/extended keys/IME, multi-user session switching and input cleanup under network failure. No UAC/logon control.
-- Signed MSI/EXE packaging, code-signing ownership and certificate lifecycle; installer execution/uninstall verification. Installer is per-user, visible in installed applications and Start menu; no hidden service or startup registration.
+- Signed MSI/EXE packaging, code-signing ownership and certificate lifecycle; unsigned installer generation and isolated silent install/uninstall passed on Windows CI; interactive lab installation remains unverified. Installer is per-user, visible in installed applications and Start menu; no hidden service or startup registration.
 - Automatic desktop activity indicator inside the remote user's session beyond the visible agent window; per-session local consent policy, device-specific ACLs and organization access policies.
 - Production reset-mail transport, MFA recovery codes, reset-token handling policy and forced change of admin-issued temporary passwords.
 - Global platform administration audit events, append-only audit enforcement beyond DB-role grants, retention/export and independent tamper evidence. No desktop recording.

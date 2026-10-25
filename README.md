@@ -14,6 +14,10 @@ This is application source, not a production-ready remote access product. No VPS
 - DPAPI CurrentUser identity storage; reconnect with bounded exponential backoff; presence heartbeat/watchdog; release held input on disconnect/revoke; frame backpressure and a basic capture/send-time FPS adjustment. Viewer counts received frames/bytes and measures server RTT (not end-to-end input latency).
 - CI source for Node validation, native PostgreSQL checks, Playwright, Windows build, grant contract checks, self-contained publishing, unsigned Inno Setup installer and artifact uploads. No automatic releases or deployment.
 
+## Verified GitHub CI
+
+[Run #3 — all four jobs succeeded](https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012): 28 unit/API/protocol tests, 3 browser tests, 5 native PostgreSQL 17 checks, 5 C# grant checks, web/server build, Windows agent build, unsigned installer creation and isolated silent install/uninstall smoke checks. [Windows build + installer artifact](https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012/artifacts/12593293420). This does not verify interactive desktop capture/input. Source-only documentation updates after the tested commit do not change executable behavior.
+
 ## Evidence and gaps
 
 See [readiness report](docs/READINESS_AR.md), [architecture](docs/ARCHITECTURE.md), [security](docs/SECURITY.md), [protocol](docs/PROTOCOL.md), [development](docs/DEVELOPMENT.md), [Windows verification](docs/WINDOWS_VALIDATION.md), and [future deployment](docs/DEPLOYMENT.md).

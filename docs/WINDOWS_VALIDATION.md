@@ -1,13 +1,13 @@
 # Two Windows device validation gate
 
-**Not yet ready to approve an institutional pilot.** Source and self-contained x64 agent build exist. Runtime behavior has not been tested on Windows. No real school device was contacted.
+**Not yet ready to approve an institutional pilot.** Private repository, self-contained x64 agent and unsigned installer exist. Windows CI build and isolated install/uninstall smoke checks passed in run 40180726012. Interactive agent runtime behavior has not been tested on Windows. No real school device was contacted.
 
 Future authorized setup: Windows target VM A with a normal logged-on test user and visible agent; Windows device B with a supported browser; a dedicated development backend/PostgreSQL with trusted local HTTPS. Do not disable TLS certificate validation, antivirus or UAC. Install/enable only with explicit authorization. No VPS is necessary for a closed lab; HTTPS trust and connectivity must be established by the lab operator.
 
-Acceptance checklist (all pending):
+Acceptance checklist (CI packaging gates 1–2 passed; interactive lab gates remain pending):
 
-1. Windows runner builds, installer is generated; inspect hash and signature status. Review unsigned preview warning before use.
-2. Installer appears under Installed Apps and Start menu; uninstall removes program files. DPAPI identity removal must be explicitly invoked from agent; server trust revocation remains independent.
+1. PASSED IN CI: Windows runner builds and unsigned installer generation. Check the artifact hash in BUILD_ARTIFACTS.json and review unsigned preview status before lab use.
+2. PASSED IN CI: Installer appears under Installed Apps and Start menu, bundles runtime licenses, does not silently start Agent and removes executable/registry/shortcut on uninstall. Repeat on the chosen lab devices. DPAPI identity removal must be explicitly invoked from agent; server trust revocation remains independent.
 3. Enrollment generates local RSA key, consumes token once, shows device ID. Reject expired/wrong-organization token and observe no duplicate identity.
 4. Start visible agent manually; dashboard online; heartbeat loss goes offline within ~30 seconds. Disable access immediately stops connection. Restart/reconnect requires new authorization, not old grant replay.
 5. View-only session streams a real desktop and never injects input. Control session mouse, left/right buttons and supported keys work in a non-elevated test editor. Type Arabic and English; keyboard layout/IME limitations must be resolved rather than assumed correct.

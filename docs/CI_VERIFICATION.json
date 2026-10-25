@@ -1,0 +1,378 @@
+{
+  "run_id": 40180726012,
+  "source_commit": "b6cd077a7fb25610b25c8e7da73493332bab8d95",
+  "run_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012",
+  "jobs": [
+    {
+      "id": 121131036827,
+      "name": "postgres",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 40180726012,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run node --import tsx tests/postgres.integration.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        }
+      ]
+    },
+    {
+      "id": 121131036958,
+      "name": "e2e",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 40180726012,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run npx playwright install --with-deps chromium",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run npm run test:e2e",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ]
+    },
+    {
+      "id": 121131037005,
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 40180726012,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-dotnet@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run dotnet build apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run dotnet run --project tests/agent-contract/Agent.Contract.csproj -c Release",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run dotnet publish apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/agent",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run Copy-Item -Recurse docs/licenses artifacts/agent/licenses",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run choco install innosetup --no-progress -y",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run & \"${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe\" apps/windows-agent/installer/Nexora.iss",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Verify visible install and clean uninstall without launching Agent",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Post Run actions/setup-dotnet@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        }
+      ]
+    },
+    {
+      "id": 121131037086,
+      "name": "node",
+      "status": "completed",
+      "conclusion": "success",
+      "run_id": 40180726012,
+      "logs_url": null,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run npm run lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run npm run typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run npm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run npm audit --omit=dev --audit-level=high",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12594432556,
+      "name": "web-server-build",
+      "size_in_bytes": 118441,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12594432556",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12594432556/zip",
+      "expired": false,
+      "created_at": "2026-10-25T09:28:04Z",
+      "expires_at": "2026-11-08T09:28:03Z",
+      "updated_at": "2026-10-25T09:28:04Z",
+      "digest": "sha256:1430838ae4ea6ff2a00b8968f94d3885df3161ebc44ffc6d52e7014755aba790",
+      "workflow_run": {
+        "id": 40180726012,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "b6cd077a7fb25610b25c8e7da73493332bab8d95"
+      }
+    },
+    {
+      "id": 12593293420,
+      "name": "windows-agent-unsigned-engineering-preview",
+      "size_in_bytes": 92509474,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12593293420",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12593293420/zip",
+      "expired": false,
+      "created_at": "2026-10-25T09:29:00Z",
+      "expires_at": "2026-11-08T09:28:55Z",
+      "updated_at": "2026-10-25T09:29:00Z",
+      "digest": "sha256:c35b7b9748df6be2f3fc168bdb5085cf27f97f60b0401066560af4dddb00adb8",
+      "workflow_run": {
+        "id": 40180726012,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "b6cd077a7fb25610b25c8e7da73493332bab8d95"
+      }
+    }
+  ],
+  "windowsEvidence": [
+    "2026-10-25T09:28:06.2756952Z Build succeeded.\r",
+    "2026-10-25T09:28:09.6772243Z 5 grant contract checks passed; no desktop capture/input tested\r",
+    "2026-10-25T09:28:46.8408553Z Successful compile (16.766 sec). Resulting Setup program filename is:\r",
+    "2026-10-25T09:28:53.2189268Z Installer install/registration/shortcut/license/uninstall smoke checks passed; no desktop control tested.\r",
+    "2026-10-25T09:29:00.6402963Z Artifact windows-agent-unsigned-engineering-preview has been successfully uploaded! Final size is 92509474 bytes. Artifact ID is 12593293420\r"
+  ],
+  "interactiveDesktopVerified": false,
+  "productionDeployment": false
+}
