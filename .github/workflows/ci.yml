@@ -66,10 +66,15 @@ jobs:
       - run: choco install innosetup --no-progress -y
       - shell: pwsh
         run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" apps/windows-agent/installer/Nexora.iss'
+      - name: Verify visible install and clean uninstall without launching Agent
+        shell: pwsh
+        run: ./.github/scripts/test-installer.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: windows-agent-unsigned-engineering-preview
           path: |
             artifacts/agent
             artifacts/*-unsigned.exe
+            artifacts/installer-smoke.json
+            artifacts/installer-*.log
           retention-days: 14
