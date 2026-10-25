@@ -1,527 +1,817 @@
 {
-  "run_id": 40186778292,
-  "run_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40186778292",
-  "source_commit": "7072a40efe11f47b016248a217b3a3e743ed4aeb",
+  "phase": 3,
+  "version": "0.3.0",
+  "source_commit": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+  "run_id": 40221447469,
+  "run_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+  "conclusion": "success",
   "jobs": [
     {
-      "id": 121149141558,
-      "name": "node",
+      "id": 121253698816,
+      "run_id": 40221447469,
+      "workflow_name": "Verify NEXORA Remote",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVWo3pM8AAAAcO0idAA",
+      "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/jobs/121253698816",
+      "html_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469/job/121253698816",
       "status": "completed",
       "conclusion": "success",
-      "run_id": 40186778292,
-      "logs_url": null,
-      "steps": [
-        {
-          "name": "Set up job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 1
-        },
-        {
-          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 2
-        },
-        {
-          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 3
-        },
-        {
-          "name": "Run npm ci",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 4
-        },
-        {
-          "name": "Run npm run lint",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 5
-        },
-        {
-          "name": "Run npm run typecheck",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 6
-        },
-        {
-          "name": "Run npm test",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 7
-        },
-        {
-          "name": "Run npm run build",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 8
-        },
-        {
-          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 9
-        },
-        {
-          "name": "Run npm audit --omit=dev --audit-level=high",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 10
-        },
-        {
-          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 11
-        },
-        {
-          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 21
-        },
-        {
-          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 22
-        },
-        {
-          "name": "Complete job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 23
-        }
-      ]
-    },
-    {
-      "id": 121149141630,
-      "name": "e2e",
-      "status": "completed",
-      "conclusion": "success",
-      "run_id": 40186778292,
-      "logs_url": null,
-      "steps": [
-        {
-          "name": "Set up job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 1
-        },
-        {
-          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 2
-        },
-        {
-          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 3
-        },
-        {
-          "name": "Run npm ci",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 4
-        },
-        {
-          "name": "Run npx playwright install --with-deps chromium",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 5
-        },
-        {
-          "name": "Run npm run test:e2e",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 6
-        },
-        {
-          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 7
-        },
-        {
-          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 13
-        },
-        {
-          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 14
-        },
-        {
-          "name": "Complete job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 15
-        }
-      ]
-    },
-    {
-      "id": 121149141697,
-      "name": "postgres",
-      "status": "completed",
-      "conclusion": "success",
-      "run_id": 40186778292,
-      "logs_url": null,
-      "steps": [
-        {
-          "name": "Set up job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 1
-        },
-        {
-          "name": "Initialize containers",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 2
-        },
-        {
-          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 3
-        },
-        {
-          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 4
-        },
-        {
-          "name": "Run npm ci",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 5
-        },
-        {
-          "name": "Run node --import tsx tests/postgres.integration.ts",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 6
-        },
-        {
-          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 10
-        },
-        {
-          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 11
-        },
-        {
-          "name": "Stop containers",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 12
-        },
-        {
-          "name": "Complete job",
-          "status": "completed",
-          "conclusion": "success",
-          "number": 13
-        }
-      ]
-    },
-    {
-      "id": 121149141747,
+      "created_at": "2026-10-25T18:28:59Z",
+      "started_at": "2026-10-25T18:29:00Z",
+      "completed_at": "2026-10-25T18:32:37Z",
       "name": "windows",
-      "status": "completed",
-      "conclusion": "success",
-      "run_id": 40186778292,
-      "logs_url": null,
       "steps": [
         {
           "name": "Set up job",
           "status": "completed",
           "conclusion": "success",
-          "number": 1
+          "number": 1,
+          "started_at": "2026-10-25T18:29:01Z",
+          "completed_at": "2026-10-25T18:29:03Z"
         },
         {
           "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
           "status": "completed",
           "conclusion": "success",
-          "number": 2
+          "number": 2,
+          "started_at": "2026-10-25T18:29:03Z",
+          "completed_at": "2026-10-25T18:29:09Z"
         },
         {
           "name": "Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
           "status": "completed",
           "conclusion": "success",
-          "number": 3
+          "number": 3,
+          "started_at": "2026-10-25T18:29:09Z",
+          "completed_at": "2026-10-25T18:29:12Z"
         },
         {
           "name": "Run dotnet build apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release",
           "status": "completed",
           "conclusion": "success",
-          "number": 4
+          "number": 4,
+          "started_at": "2026-10-25T18:29:12Z",
+          "completed_at": "2026-10-25T18:29:34Z"
         },
         {
           "name": "Run dotnet run --project tests/agent-contract/Agent.Contract.csproj -c Release",
           "status": "completed",
           "conclusion": "success",
-          "number": 5
+          "number": 5,
+          "started_at": "2026-10-25T18:29:34Z",
+          "completed_at": "2026-10-25T18:29:40Z"
         },
         {
           "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
           "status": "completed",
           "conclusion": "success",
-          "number": 6
+          "number": 6,
+          "started_at": "2026-10-25T18:29:40Z",
+          "completed_at": "2026-10-25T18:29:51Z"
         },
         {
           "name": "Run npm ci",
           "status": "completed",
           "conclusion": "success",
-          "number": 7
+          "number": 7,
+          "started_at": "2026-10-25T18:29:51Z",
+          "completed_at": "2026-10-25T18:30:11Z"
         },
         {
           "name": "Windows IPC, DPAPI, encoding and real loopback engine validation",
           "status": "completed",
           "conclusion": "success",
-          "number": 8
+          "number": 8,
+          "started_at": "2026-10-25T18:30:11Z",
+          "completed_at": "2026-10-25T18:30:30Z"
         },
         {
           "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
           "status": "completed",
           "conclusion": "success",
-          "number": 9
+          "number": 9,
+          "started_at": "2026-10-25T18:30:30Z",
+          "completed_at": "2026-10-25T18:30:31Z"
+        },
+        {
+          "name": "Checkout immutable 0.2.0 upgrade baseline",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-25T18:30:31Z",
+          "completed_at": "2026-10-25T18:30:35Z"
+        },
+        {
+          "name": "Build old 0.2.0 Agent for real upgrade",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-25T18:30:35Z",
+          "completed_at": "2026-10-25T18:30:47Z"
         },
         {
           "name": "Run dotnet publish apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/agent",
           "status": "completed",
           "conclusion": "success",
-          "number": 10
+          "number": 12,
+          "started_at": "2026-10-25T18:30:47Z",
+          "completed_at": "2026-10-25T18:30:54Z"
         },
         {
           "name": "Run Copy-Item -Recurse docs/licenses artifacts/agent/licenses",
           "status": "completed",
           "conclusion": "success",
-          "number": 11
+          "number": 13,
+          "started_at": "2026-10-25T18:30:54Z",
+          "completed_at": "2026-10-25T18:30:54Z"
         },
         {
           "name": "Run choco install innosetup --no-progress -y",
           "status": "completed",
           "conclusion": "success",
-          "number": 12
+          "number": 14,
+          "started_at": "2026-10-25T18:30:54Z",
+          "completed_at": "2026-10-25T18:31:02Z"
         },
         {
           "name": "Run & \"${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe\" apps/windows-agent/installer/Nexora.iss",
           "status": "completed",
           "conclusion": "success",
-          "number": 13
+          "number": 15,
+          "started_at": "2026-10-25T18:31:02Z",
+          "completed_at": "2026-10-25T18:31:29Z"
+        },
+        {
+          "name": "Build immutable 0.2 installer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-25T18:31:29Z",
+          "completed_at": "2026-10-25T18:31:54Z"
         },
         {
           "name": "Verify visible install and clean uninstall without launching Agent",
           "status": "completed",
           "conclusion": "success",
-          "number": 14
+          "number": 17,
+          "started_at": "2026-10-25T18:31:54Z",
+          "completed_at": "2026-10-25T18:32:21Z"
         },
         {
           "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
           "status": "completed",
           "conclusion": "success",
-          "number": 15
+          "number": 18,
+          "started_at": "2026-10-25T18:32:21Z",
+          "completed_at": "2026-10-25T18:32:30Z"
+        },
+        {
+          "name": "Post Checkout immutable 0.2.0 upgrade baseline",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-10-25T18:32:30Z",
+          "completed_at": "2026-10-25T18:32:33Z"
         },
         {
           "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
           "status": "completed",
           "conclusion": "success",
-          "number": 28
+          "number": 34,
+          "started_at": "2026-10-25T18:32:33Z",
+          "completed_at": "2026-10-25T18:32:33Z"
         },
         {
           "name": "Post Run actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68",
           "status": "completed",
           "conclusion": "success",
-          "number": 29
+          "number": 35,
+          "started_at": "2026-10-25T18:32:33Z",
+          "completed_at": "2026-10-25T18:32:33Z"
         },
         {
           "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
           "status": "completed",
           "conclusion": "success",
-          "number": 30
+          "number": 36,
+          "started_at": "2026-10-25T18:32:33Z",
+          "completed_at": "2026-10-25T18:32:36Z"
         },
         {
           "name": "Complete job",
           "status": "completed",
           "conclusion": "success",
-          "number": 31
+          "number": 37,
+          "started_at": "2026-10-25T18:32:36Z",
+          "completed_at": "2026-10-25T18:32:36Z"
         }
-      ]
-    }
-  ],
-  "evidence": [
-    {
-      "name": "node",
-      "id": 121149141558,
-      "conclusion": "success",
-      "evidence": [
-        "2026-10-25T10:56:09.3817384Z found 0 vulnerabilities",
-        "2026-10-25T10:56:11.7096072Z Source hygiene checks passed",
-        "2026-10-25T10:56:19.8930345Z \u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m4 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m",
-        "2026-10-25T10:56:19.8941712Z \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m36 passed\u001b[39m\u001b[22m\u001b[90m (36)\u001b[39m",
-        "2026-10-25T10:56:22.5674817Z found 0 vulnerabilities"
-      ]
-    },
-    {
-      "name": "e2e",
-      "id": 121149141630,
-      "conclusion": "success",
-      "evidence": [
-        "2026-10-25T10:56:10.0568625Z found 0 vulnerabilities",
-        "2026-10-25T10:56:53.2481888Z   4 passed (11.1s)"
-      ]
-    },
-    {
-      "name": "postgres",
-      "id": 121149141697,
-      "conclusion": "success",
-      "evidence": [
-        "2026-10-25T10:56:33.4829402Z found 0 vulnerabilities",
-        "2026-10-25T10:56:33.8001598Z 5 native PostgreSQL migration/RLS/tenant constraint checks passed"
-      ]
-    },
-    {
-      "name": "windows",
-      "id": 121149141747,
-      "conclusion": "success",
-      "evidence": [
-        "2026-10-25T10:56:51.9036233Z Build succeeded.\r",
-        "2026-10-25T10:56:55.6371195Z 5 grant contract checks passed; no desktop capture/input tested\r",
-        "2026-10-25T10:57:22.2633786Z found 0 vulnerabilities\r",
-        "2026-10-25T10:59:15.1228913Z Machine service install/start/stop/restart/upgrade/uninstall checks passed.\r"
       ],
-      "native": {
-        "ipcFramingAndAclChecks": true,
-        "nativePipePidChecks": true,
-        "machineIdentityDpapiAcl": true,
-        "syntheticEncoding": {
-          "frames": 20,
-          "elapsedMs": 866.9536,
-          "cpuMs": 250,
-          "totalBytes": 86140,
-          "memoryBytes": 49467392,
-          "realScreen": false
+      "check_run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/check-runs/121253698816",
+      "labels": ["windows-2025"],
+      "runner_id": 1000000252,
+      "runner_name": "GitHub Actions 1000000252",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121253698937,
+      "run_id": 40221447469,
+      "workflow_name": "Verify NEXORA Remote",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVWo3pM8AAAAcO0ideQ",
+      "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/jobs/121253698937",
+      "html_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469/job/121253698937",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-25T18:28:59Z",
+      "started_at": "2026-10-25T18:29:01Z",
+      "completed_at": "2026-10-25T18:29:42Z",
+      "name": "node",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-25T18:29:02Z",
+          "completed_at": "2026-10-25T18:29:03Z"
         },
-        "interactiveProbeAvailable": true,
-        "interactiveComponentValidated": true,
-        "twoWindowsEndToEndValidated": false,
-        "realLoopbackEngine": {
-          "realWindowsCapture": true,
-          "realBackendRelay": true,
-          "realArabicSendInput": true,
-          "realMouseClick": true,
-          "resolutionScaling": true,
-          "agentAutomaticReconnect": true,
-          "freshGrantAfterReconnect": true,
-          "sessionRevocation": true,
-          "observedTextRoundTripMs": 64.6213,
-          "latencyMeasurement": "WebSocket send to own textbox observation, 50ms polling; not photon latency",
-          "sampledFrameBytes": 56404,
-          "twoWindows": false,
-          "serviceWorkerPath": false
+        {
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-25T18:29:03Z",
+          "completed_at": "2026-10-25T18:29:04Z"
         },
-        "interactiveChecks": [
-          "GDI capture of own window marker",
-          "JPEG decode",
-          "Arabic Unicode input in own textbox",
-          "Mouse click in own window",
-          "Post-revocation rejection"
-        ]
-      }
+        {
+          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-25T18:29:04Z",
+          "completed_at": "2026-10-25T18:29:08Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-25T18:29:08Z",
+          "completed_at": "2026-10-25T18:29:15Z"
+        },
+        {
+          "name": "Run npm run lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-25T18:29:15Z",
+          "completed_at": "2026-10-25T18:29:17Z"
+        },
+        {
+          "name": "Run npm run typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-25T18:29:17Z",
+          "completed_at": "2026-10-25T18:29:19Z"
+        },
+        {
+          "name": "Run npm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-25T18:29:19Z",
+          "completed_at": "2026-10-25T18:29:33Z"
+        },
+        {
+          "name": "Run npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-25T18:29:33Z",
+          "completed_at": "2026-10-25T18:29:35Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-25T18:29:35Z",
+          "completed_at": "2026-10-25T18:29:36Z"
+        },
+        {
+          "name": "Run npm audit --omit=dev --audit-level=high",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-25T18:29:36Z",
+          "completed_at": "2026-10-25T18:29:37Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-25T18:29:37Z",
+          "completed_at": "2026-10-25T18:29:39Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-25T18:29:39Z",
+          "completed_at": "2026-10-25T18:29:39Z"
+        },
+        {
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-25T18:29:39Z",
+          "completed_at": "2026-10-25T18:29:39Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-25T18:29:39Z",
+          "completed_at": "2026-10-25T18:29:39Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/check-runs/121253698937",
+      "labels": ["ubuntu-24.04"],
+      "runner_id": 1000000251,
+      "runner_name": "GitHub Actions 1000000251",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121253698949,
+      "run_id": 40221447469,
+      "workflow_name": "Verify NEXORA Remote",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVWo3pM8AAAAcO0idhQ",
+      "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/jobs/121253698949",
+      "html_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469/job/121253698949",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-25T18:28:59Z",
+      "started_at": "2026-10-25T18:29:01Z",
+      "completed_at": "2026-10-25T18:29:22Z",
+      "name": "netem",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-25T18:29:01Z",
+          "completed_at": "2026-10-25T18:29:02Z"
+        },
+        {
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-25T18:29:02Z",
+          "completed_at": "2026-10-25T18:29:03Z"
+        },
+        {
+          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-25T18:29:03Z",
+          "completed_at": "2026-10-25T18:29:05Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-25T18:29:05Z",
+          "completed_at": "2026-10-25T18:29:11Z"
+        },
+        {
+          "name": "Run bash .github/scripts/test-netem.sh",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-25T18:29:11Z",
+          "completed_at": "2026-10-25T18:29:19Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-25T18:29:19Z",
+          "completed_at": "2026-10-25T18:29:20Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-25T18:29:20Z",
+          "completed_at": "2026-10-25T18:29:20Z"
+        },
+        {
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-25T18:29:20Z",
+          "completed_at": "2026-10-25T18:29:20Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-25T18:29:20Z",
+          "completed_at": "2026-10-25T18:29:20Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/check-runs/121253698949",
+      "labels": ["ubuntu-24.04"],
+      "runner_id": 1000000253,
+      "runner_name": "GitHub Actions 1000000253",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121253699072,
+      "run_id": 40221447469,
+      "workflow_name": "Verify NEXORA Remote",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVWo3pM8AAAAcO0ieAA",
+      "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/jobs/121253699072",
+      "html_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469/job/121253699072",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-25T18:28:59Z",
+      "started_at": "2026-10-25T18:29:01Z",
+      "completed_at": "2026-10-25T18:29:55Z",
+      "name": "e2e",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-25T18:29:02Z",
+          "completed_at": "2026-10-25T18:29:03Z"
+        },
+        {
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-25T18:29:03Z",
+          "completed_at": "2026-10-25T18:29:04Z"
+        },
+        {
+          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-25T18:29:04Z",
+          "completed_at": "2026-10-25T18:29:06Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-25T18:29:06Z",
+          "completed_at": "2026-10-25T18:29:10Z"
+        },
+        {
+          "name": "Run npx playwright install --with-deps chromium",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-25T18:29:10Z",
+          "completed_at": "2026-10-25T18:29:41Z"
+        },
+        {
+          "name": "Run npm run test:e2e",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-25T18:29:41Z",
+          "completed_at": "2026-10-25T18:29:53Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-25T18:29:53Z",
+          "completed_at": "2026-10-25T18:29:53Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-25T18:29:53Z",
+          "completed_at": "2026-10-25T18:29:53Z"
+        },
+        {
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-25T18:29:53Z",
+          "completed_at": "2026-10-25T18:29:53Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-25T18:29:53Z",
+          "completed_at": "2026-10-25T18:29:53Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/check-runs/121253699072",
+      "labels": ["ubuntu-24.04"],
+      "runner_id": 1000000254,
+      "runner_name": "GitHub Actions 1000000254",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121253699114,
+      "run_id": 40221447469,
+      "workflow_name": "Verify NEXORA Remote",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/runs/40221447469",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVWo3pM8AAAAcO0ieKg",
+      "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/jobs/121253699114",
+      "html_url": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40221447469/job/121253699114",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-25T18:28:59Z",
+      "started_at": "2026-10-25T18:29:01Z",
+      "completed_at": "2026-10-25T18:29:38Z",
+      "name": "postgres",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-25T18:29:01Z",
+          "completed_at": "2026-10-25T18:29:02Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-25T18:29:02Z",
+          "completed_at": "2026-10-25T18:29:26Z"
+        },
+        {
+          "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-25T18:29:26Z",
+          "completed_at": "2026-10-25T18:29:26Z"
+        },
+        {
+          "name": "Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-25T18:29:26Z",
+          "completed_at": "2026-10-25T18:29:29Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-25T18:29:29Z",
+          "completed_at": "2026-10-25T18:29:32Z"
+        },
+        {
+          "name": "Run node --import tsx tests/postgres.integration.ts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-25T18:29:32Z",
+          "completed_at": "2026-10-25T18:29:32Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-25T18:29:32Z",
+          "completed_at": "2026-10-25T18:29:32Z"
+        },
+        {
+          "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-25T18:29:32Z",
+          "completed_at": "2026-10-25T18:29:33Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-25T18:29:33Z",
+          "completed_at": "2026-10-25T18:29:37Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-25T18:29:37Z",
+          "completed_at": "2026-10-25T18:29:37Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/check-runs/121253699114",
+      "labels": ["ubuntu-24.04"],
+      "runner_id": 1000000255,
+      "runner_name": "GitHub Actions 1000000255",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
     }
   ],
   "artifacts": [
     {
-      "id": 12596530331,
-      "name": "windows-agent-unsigned-engineering-preview",
-      "size_in_bytes": 92639555,
-      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596530331",
-      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596530331/zip",
-      "expired": false,
-      "created_at": "2026-10-25T10:59:21Z",
-      "expires_at": "2026-11-08T10:59:15Z",
-      "updated_at": "2026-10-25T10:59:21Z",
-      "digest": "sha256:857c03af3f04578d2031e9ea26dcd5e0f05d7c13db5ede078907f7f12ea120ae",
-      "workflow_run": {
-        "id": 40186778292,
-        "repository_id": 1433024420,
-        "head_repository_id": 1433024420,
-        "head_branch": "main",
-        "head_sha": "7072a40efe11f47b016248a217b3a3e743ed4aeb"
-      }
-    },
-    {
-      "id": 12596348632,
-      "name": "network-benchmark",
-      "size_in_bytes": 541,
-      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596348632",
-      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596348632/zip",
-      "expired": false,
-      "created_at": "2026-10-25T10:56:21Z",
-      "expires_at": "2026-11-08T10:56:21Z",
-      "updated_at": "2026-10-25T10:56:21Z",
-      "digest": "sha256:01d58e47748c4ffca95a13f310b3f2ffc7eec33019631ad2250798bde691b153",
-      "workflow_run": {
-        "id": 40186778292,
-        "repository_id": 1433024420,
-        "head_repository_id": 1433024420,
-        "head_branch": "main",
-        "head_sha": "7072a40efe11f47b016248a217b3a3e743ed4aeb"
-      }
-    },
-    {
-      "id": 12596224165,
-      "name": "windows-validation-evidence",
-      "size_in_bytes": 710,
-      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596224165",
-      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12596224165/zip",
-      "expired": false,
-      "created_at": "2026-10-25T10:57:49Z",
-      "expires_at": "2026-11-08T10:57:48Z",
-      "updated_at": "2026-10-25T10:57:49Z",
-      "digest": "sha256:e0fa50cdf5cf4ae6eef8935af8dfef4a5c02aa68a11938ac6bfdb16dff1ce88e",
-      "workflow_run": {
-        "id": 40186778292,
-        "repository_id": 1433024420,
-        "head_repository_id": 1433024420,
-        "head_branch": "main",
-        "head_sha": "7072a40efe11f47b016248a217b3a3e743ed4aeb"
-      }
-    },
-    {
-      "id": 12595754972,
+      "id": 12609830302,
       "name": "web-server-build",
-      "size_in_bytes": 129971,
-      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12595754972",
-      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12595754972/zip",
+      "size_in_bytes": 133159,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609830302",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609830302/zip",
       "expired": false,
-      "created_at": "2026-10-25T10:56:23Z",
-      "expires_at": "2026-11-08T10:56:22Z",
-      "updated_at": "2026-10-25T10:56:23Z",
-      "digest": "sha256:cb00fa730f4706fe36f1906faa2e795724ac77d7b1552849bfba9c43bb64f01d",
+      "created_at": "2026-10-25T18:29:38Z",
+      "expires_at": "2026-11-08T18:29:37Z",
+      "updated_at": "2026-10-25T18:29:38Z",
+      "digest": "sha256:e12e82771cc5f569e1c867cd2c6bd48c621f7daa68046c99549662cd561441d4",
       "workflow_run": {
-        "id": 40186778292,
+        "id": 40221447469,
         "repository_id": 1433024420,
         "head_repository_id": 1433024420,
         "head_branch": "main",
-        "head_sha": "7072a40efe11f47b016248a217b3a3e743ed4aeb"
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12609616072,
+      "name": "network-benchmark",
+      "size_in_bytes": 651,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609616072",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609616072/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:29:36Z",
+      "expires_at": "2026-11-08T18:29:35Z",
+      "updated_at": "2026-10-25T18:29:36Z",
+      "digest": "sha256:c86fdbed294394da0a2888288f8e6a9d7ac7d64f7010a6740baa1c434ec13219",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12609344867,
+      "name": "windows-validation-evidence",
+      "size_in_bytes": 1045,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609344867",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609344867/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:30:31Z",
+      "expires_at": "2026-11-08T18:30:30Z",
+      "updated_at": "2026-10-25T18:30:31Z",
+      "digest": "sha256:100e114babd487b820d7fb408b29d7b596028adb554ee0935530c48c69f2d586",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12608598845,
+      "name": "netem-network-evidence",
+      "size_in_bytes": 1392,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608598845",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608598845/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:29:19Z",
+      "expires_at": "2026-11-08T18:29:19Z",
+      "updated_at": "2026-10-25T18:29:19Z",
+      "digest": "sha256:640714afa3848d00e6a1081bc3d34c221f906bba5f069487dcc0d4e2c0565aec",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12608564205,
+      "name": "windows-agent-unsigned-engineering-preview",
+      "size_in_bytes": 92661026,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608564205",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608564205/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:32:30Z",
+      "expires_at": "2026-11-08T18:32:23Z",
+      "updated_at": "2026-10-25T18:32:30Z",
+      "digest": "sha256:4b5742dbbdc9b67042bdabac239c3c36bff72df25704403251e5c1e95634bb90",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
       }
     }
   ],
-  "two_windows_validated": false,
-  "service_worker_end_to_end_validated": false,
+  "evidence": [
+    {
+      "name": "windows",
+      "id": 121253698816,
+      "conclusion": "success",
+      "lines": [
+        "2026-10-25T18:29:33.8455546Z Build succeeded.\r",
+        "2026-10-25T18:29:39.8671999Z 5 grant contract checks passed; no desktop capture/input tested\r",
+        "2026-10-25T18:29:39.8745060Z 5 streaming and session lifecycle policy checks passed\r",
+        "2026-10-25T18:30:10.3530141Z found 0 vulnerabilities\r",
+        "2026-10-25T18:32:21.3466125Z Machine service install/start/stop/restart/upgrade/uninstall checks passed.\r"
+      ]
+    },
+    {
+      "name": "node",
+      "id": 121253698937,
+      "conclusion": "success",
+      "lines": [
+        "2026-10-25T18:29:15.5062312Z found 0 vulnerabilities",
+        "2026-10-25T18:29:33.1459376Z       Tests  40 passed (40)",
+        "2026-10-25T18:29:37.3472951Z found 0 vulnerabilities"
+      ]
+    },
+    {
+      "name": "netem",
+      "id": 121253698949,
+      "conclusion": "success",
+      "lines": ["2026-10-25T18:29:11.5970437Z found 0 vulnerabilities"]
+    },
+    {
+      "name": "e2e",
+      "id": 121253699072,
+      "conclusion": "success",
+      "lines": [
+        "2026-10-25T18:29:10.9052691Z found 0 vulnerabilities",
+        "2026-10-25T18:29:53.1129808Z   4 passed (10.9s)"
+      ]
+    },
+    {
+      "name": "postgres",
+      "id": 121253699114,
+      "conclusion": "success",
+      "lines": [
+        "2026-10-25T18:29:32.4467648Z found 0 vulnerabilities",
+        "2026-10-25T18:29:32.7378851Z 5 native PostgreSQL migration/RLS/tenant constraint checks passed"
+      ]
+    }
+  ],
+  "windows_to_windows": false,
+  "reboot_test_executed": false,
+  "service_worker_end_to_end": false,
   "production_deployed": false
 }

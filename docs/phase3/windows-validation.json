@@ -1,0 +1,71 @@
+{
+  "ipcFramingAndAclChecks": true,
+  "nativePipePidChecks": true,
+  "machineIdentityDpapiAcl": true,
+  "syntheticEncoding": {
+    "frames": 20,
+    "elapsedMs": 408.6146,
+    "cpuMs": 343.75,
+    "totalBytes": 86140,
+    "memoryBytes": 49332224,
+    "realScreen": false
+  },
+  "interactiveProbeAvailable": true,
+  "interactiveComponentValidated": true,
+  "twoWindowsEndToEndValidated": false,
+  "captureComparison": {
+    "scope": "Sequential same-run real desktop microbenchmark; baseline retains current shared JPEG encoder; not a historical 0.2 binary, WAN or service-worker benchmark",
+    "results": [
+      {
+        "profile": "allocation-per-frame baseline",
+        "frames": 10,
+        "elapsedMs": 505.8144,
+        "meanCaptureMs": 37.42533,
+        "meanEncodeMs": 12.80631,
+        "bytes": 376220,
+        "averageFrameBytes": 37622,
+        "cpuMs": 281.25,
+        "managedAllocationBytes": 751352,
+        "rssBytes": 69865472,
+        "realWindowsCapture": true,
+        "networkMeasured": false
+      },
+      {
+        "profile": "reused capture bitmap",
+        "frames": 10,
+        "elapsedMs": 458.1845,
+        "meanCaptureMs": 33.11768,
+        "meanEncodeMs": 12.60423,
+        "bytes": 376220,
+        "averageFrameBytes": 37622,
+        "cpuMs": 203.125,
+        "managedAllocationBytes": 766968,
+        "rssBytes": 71163904,
+        "realWindowsCapture": true,
+        "networkMeasured": false
+      }
+    ]
+  },
+  "realLoopbackEngine": {
+    "realWindowsCapture": true,
+    "realBackendRelay": true,
+    "realArabicSendInput": true,
+    "realMouseClick": true,
+    "resolutionScaling": true,
+    "agentAutomaticReconnect": true,
+    "freshGrantAfterReconnect": true,
+    "sessionRevocation": true,
+    "observedTextRoundTripMs": 124.769,
+    "latencyMeasurement": "WebSocket send to own textbox observation, 50ms polling; not photon latency",
+    "sampledFrameBytes": 52920,
+    "twoWindows": false,
+    "serviceWorkerPath": false
+  },
+  "interactiveChecks": [
+    "GDI capture of own window marker",
+    "JPEG decode",
+    "Arabic Unicode input in own textbox",
+    "Mouse click in own window",
+    "Post-revocation rejection"
+  ]
+}

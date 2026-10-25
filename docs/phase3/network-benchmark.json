@@ -1,0 +1,37 @@
+{
+  "scope": "Synthetic loopback WS application-frame shaping; not measured Windows performance or kernel packet loss",
+  "results": [
+    {
+      "profile": "baseline",
+      "receivedFrames": 6,
+      "injectedFrameDrops": 0,
+      "elapsedSeconds": 0.20354518100000002,
+      "receivedFramesPerSecond": 29.477484902971,
+      "receivedKbps": 1931.8364506011073,
+      "cpuMs": 31.669,
+      "rssBytes": 79507456,
+      "reconnected": true,
+      "realDesktop": false,
+      "tcpPacketLossSimulated": false
+    },
+    {
+      "profile": "weak",
+      "receivedFrames": 4,
+      "injectedFrameDrops": 2,
+      "elapsedSeconds": 1.217445921,
+      "receivedFramesPerSecond": 3.285566883097718,
+      "receivedKbps": 215.32291125069202,
+      "cpuMs": 11.423,
+      "rssBytes": 80031744,
+      "reconnected": true,
+      "realDesktop": false,
+      "tcpPacketLossSimulated": false
+    }
+  ],
+  "interruptedDelivery": {
+    "partialMessagesDelivered": 0,
+    "completeMessagesDelivered": 1,
+    "reconnectMs": 2.173532000000023,
+    "scope": "Fresh TCP/WebSocket loopback connection; not Agent reauthentication timing"
+  }
+}

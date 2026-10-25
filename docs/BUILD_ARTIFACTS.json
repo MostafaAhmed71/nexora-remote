@@ -1,28 +1,115 @@
 {
-  "phase": 2,
-  "sourceCommit": "7072a40efe11f47b016248a217b3a3e743ed4aeb",
-  "githubActionsRun": 40186778292,
-  "githubRunURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40186778292",
-  "windowsArtifact": {
-    "id": 12596530331,
-    "name": "windows-agent-unsigned-engineering-preview",
-    "sha256": "857c03af3f04578d2031e9ea26dcd5e0f05d7c13db5ede078907f7f12ea120ae",
-    "sizeBytes": 92639555,
-    "expiresAt": "2026-11-08T10:59:15Z",
-    "downloadURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40186778292/artifacts/12596530331"
-  },
+  "version": "0.3.0",
+  "sourceCommit": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599",
+  "runId": 40221447469,
+  "artifacts": [
+    {
+      "id": 12609830302,
+      "name": "web-server-build",
+      "size_in_bytes": 133159,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609830302",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609830302/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:29:38Z",
+      "expires_at": "2026-11-08T18:29:37Z",
+      "updated_at": "2026-10-25T18:29:38Z",
+      "digest": "sha256:e12e82771cc5f569e1c867cd2c6bd48c621f7daa68046c99549662cd561441d4",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12609616072,
+      "name": "network-benchmark",
+      "size_in_bytes": 651,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609616072",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609616072/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:29:36Z",
+      "expires_at": "2026-11-08T18:29:35Z",
+      "updated_at": "2026-10-25T18:29:36Z",
+      "digest": "sha256:c86fdbed294394da0a2888288f8e6a9d7ac7d64f7010a6740baa1c434ec13219",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12609344867,
+      "name": "windows-validation-evidence",
+      "size_in_bytes": 1045,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609344867",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12609344867/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:30:31Z",
+      "expires_at": "2026-11-08T18:30:30Z",
+      "updated_at": "2026-10-25T18:30:31Z",
+      "digest": "sha256:100e114babd487b820d7fb408b29d7b596028adb554ee0935530c48c69f2d586",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12608598845,
+      "name": "netem-network-evidence",
+      "size_in_bytes": 1392,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608598845",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608598845/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:29:19Z",
+      "expires_at": "2026-11-08T18:29:19Z",
+      "updated_at": "2026-10-25T18:29:19Z",
+      "digest": "sha256:640714afa3848d00e6a1081bc3d34c221f906bba5f069487dcc0d4e2c0565aec",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    },
+    {
+      "id": 12608564205,
+      "name": "windows-agent-unsigned-engineering-preview",
+      "size_in_bytes": 92661026,
+      "url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608564205",
+      "archive_download_url": "https://api.github.com/repos/MostafaAhmed71/nexora-remote/actions/artifacts/12608564205/zip",
+      "expired": false,
+      "created_at": "2026-10-25T18:32:30Z",
+      "expires_at": "2026-11-08T18:32:23Z",
+      "updated_at": "2026-10-25T18:32:30Z",
+      "digest": "sha256:4b5742dbbdc9b67042bdabac239c3c36bff72df25704403251e5c1e95634bb90",
+      "workflow_run": {
+        "id": 40221447469,
+        "repository_id": 1433024420,
+        "head_repository_id": 1433024420,
+        "head_branch": "main",
+        "head_sha": "6c3fdaa3dde3577c61b3aaff6f7d8acb3f1f7599"
+      }
+    }
+  ],
   "installer": {
-    "name": "NexoraRemote-0.2.0-win-x64-unsigned.exe",
-    "sha256": "b9e2a631910b7a105708c15ea50929be98fa4fe0842634f1c2757d696f2d3f19",
-    "sizeBytes": 41747300,
-    "builtOnWindows": true,
+    "name": "NexoraRemote-0.3.0-win-x64-unsigned.exe",
     "signed": false,
-    "serviceLifecycleAndRepairUpgradeUninstallPassed": true,
-    "legacy01AutomaticMigration": false
+    "sha256": null,
+    "sha256Scope": "GitHub artifact ZIP digests listed; executable hash not independently downloaded in this phase",
+    "upgradeFrom": "0.2.0 immutable source build",
+    "upgradeTestPassed": true,
+    "fresh03TestPassed": true,
+    "registeredIdentityUpgradeValidated": false,
+    "rollbackValidated": false
   },
-  "target": "win-x64",
-  "selfContained": true,
-  "realWindowsLoopbackEngineValidated": true,
   "twoWindowsValidated": false,
-  "serviceWorkerEndToEndValidated": false
+  "rebootValidated": false
 }

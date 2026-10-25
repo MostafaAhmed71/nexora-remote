@@ -1,0 +1,26 @@
+{
+  "profile": "impaired",
+  "measured": {
+    "frames": 12,
+    "bytes": 98304,
+    "averageFrameBytes": 8192,
+    "framesPerSecond": 1.772781710179895,
+    "elapsedMs": 6769.022904,
+    "meanEchoMs": 536.1648915833333,
+    "cpuMs": 20.624,
+    "rssBytes": 65634304
+  },
+  "simulated": {
+    "oneWayDelayMs": 80,
+    "kernelPacketLossPercent": 5,
+    "rateKbit": 512
+  },
+  "notMeasured": [
+    "Windows capture",
+    "encode",
+    "mouse-to-photon latency",
+    "reboot",
+    "two Windows"
+  ],
+  "scope": "Real TCP WebSocket echo over isolated veth/netns; netem loss causes TCP retransmission, not guaranteed application frame loss"
+}

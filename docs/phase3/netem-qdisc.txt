@@ -1,0 +1,6 @@
+qdisc netem 8001: root refcnt 3 limit 1000 delay 80ms loss 5% rate 512Kbit
+ Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 0b 0p requeues 0
+qdisc netem 8001: root refcnt 3 limit 1000 delay 80ms loss 5% rate 512Kbit
+ Sent 106485 bytes 117 pkt (dropped 5, overlimits 0 requeues 0) 
+ backlog 66b 1p requeues 0

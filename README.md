@@ -1,10 +1,16 @@
 # NEXORA Remote
 
-**0.2.0 engineering preview — Phase 2. Not approved for institutional use or sale.**
+**0.3.0 engineering preview — Phase 3. Not approved for institutional use or sale.**
 
 Continue the existing private repository: https://github.com/MostafaAhmed71/nexora-remote . No VPS, public deployment, school device or production identity has been used. Large build outputs live in Actions Artifacts, not Git.
 
-## Phase 2 results
+## Phase 3
+
+Read the [Arabic execution and validation report](docs/PHASE3_REPORT_AR.md), [streaming/network methodology](docs/STREAMING_BENCHMARKS.md), [security validation](docs/SECURITY_VALIDATION.md), [Windows two-device/reboot gates](docs/WINDOWS_TWO_DEVICE_TEST.md) and [0.3 readiness](docs/RELEASE_0.3.0_READINESS.md). The exact final tested commit and artifacts are recorded in `docs/phase3/CI_VERIFICATION.json`. Phase 2 evidence below remains historical.
+
+0.3 adds session-lease invalidation, per-session worker ownership, capture bitmap reuse, one-outstanding-frame browser ACK pacing, heuristic adaptive FPS/resolution/JPEG, static JPEG suppression, transactional recovery-set replacement, scoped technician device management, actual 0.2→0.3 upgrade and independent fresh-0.3 install tests, plus isolated kernel netem impairment. Files/clipboard and advanced codecs remain disabled/absent. Full enrolled service-worker, reboot and two Windows are not validated.
+
+## Phase 2 results (historical)
 
 The Windows validation suite has exercised actual GDI desktop capture, JPEG relay through the real Fastify server, actual Arabic Unicode SendInput, a mouse click in an owned test window, encoded-resolution scaling, session revocation and automatic Agent proof/reconnect on a disposable Windows runner with a loopback backend. It is not a two-device/LAN/TLS or service-to-WTS-worker end-to-end test.
 
