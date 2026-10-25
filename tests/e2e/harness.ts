@@ -47,6 +47,13 @@ const app = await createApp({
   signingKey: k.privateKey,
   publicKey: k.publicKey,
 });
+// Disposable harness only: drop genuine Agent sockets to test fresh proof/reconnect.
+app.post("/__test__/drop-agents", async (req) => {
+  if (req.ip !== "127.0.0.1") throw new Error("Loopback only");
+  for (const ws of app.websocketServer.clients)
+    if (!ws.protocol) ws.terminate();
+  return { ok: true };
+});
 await app.listen({ host: "127.0.0.1", port: 3000 });
 for (const s of ["SIGINT", "SIGTERM"])
   process.on(s, () => {

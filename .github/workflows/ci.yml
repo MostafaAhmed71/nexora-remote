@@ -72,8 +72,23 @@ jobs:
         with: { dotnet-version: "10.0.x" }
       - run: dotnet build apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release
       - run: dotnet run --project tests/agent-contract/Agent.Contract.csproj -c Release
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - name: Start isolated loopback validation backend
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $server = Start-Process node -ArgumentList @('--import','tsx','tests/e2e/harness.ts') -PassThru -RedirectStandardOutput artifacts/loopback-backend.log -RedirectStandardError artifacts/loopback-backend-error.log
+          "NEXORA_TEST_SERVER_PID=$($server.Id)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $ready = $false
+          for ($attempt=0; $attempt -lt 30; $attempt++) {
+            try { Invoke-RestMethod http://127.0.0.1:3000/api/health | Out-Null; $ready=$true; break } catch { Start-Sleep -Milliseconds 500 }
+          }
+          if (-not $ready) { throw 'Loopback backend did not start' }
       - name: Windows native IPC, DPAPI, encoding and conditional interactive validation
         run: dotnet run --project tests/windows-native/Windows.Native.csproj -c Release
+        env: { NEXORA_TEST_BACKEND: "http://127.0.0.1:3000" }
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -102,4 +117,5 @@ jobs:
             artifacts/windows-validation.json
             artifacts/installer-*.log
             artifacts/service-smoke.log
+            artifacts/loopback-backend*.log
           retention-days: 14
