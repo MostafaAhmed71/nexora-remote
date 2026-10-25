@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+artifacts/
+bin/
+obj/
+playwright-report/
+test-results/
+*.pfx
+*.pem

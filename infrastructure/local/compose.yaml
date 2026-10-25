@@ -1,0 +1,38 @@
+name: nexora-remote-local
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: nexora_migration
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:?set a local migration password}
+      POSTGRES_DB: nexora
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexora_migration -d nexora"]
+      interval: 5s
+      retries: 10
+  backend:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/app.Dockerfile
+    profiles: [app]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?non-superuser application role required}
+      ORIGIN: http://localhost:8080
+      HOST: 0.0.0.0
+      MFA_KEY: ${MFA_KEY:?set a random 32-byte hex key}
+      SIGNING_KEY_FILE: /run/secrets/private.pem
+      PUBLIC_KEY_FILE: /run/secrets/public.pem
+    volumes: ["../../artifacts/keys:/run/secrets:ro"]
+    depends_on:
+      postgres: { condition: service_healthy }
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+    profiles: [app]
+    ports: ["127.0.0.1:8080:80"]
+    depends_on: [backend]
+volumes:
+  pgdata:

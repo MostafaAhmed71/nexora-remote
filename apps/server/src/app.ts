@@ -1,0 +1,990 @@
+import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
+import helmet from "@fastify/helmet";
+import websocket from "@fastify/websocket";
+import swagger from "@fastify/swagger";
+import swaggerUI from "@fastify/swagger-ui";
+import { z, ZodError } from "zod";
+import argon2 from "argon2";
+import { randomUUID, createPublicKey } from "node:crypto";
+import { TOTP, Secret } from "otpauth";
+import type { WebSocket } from "ws";
+import type { DB } from "../../../packages/database/index.js";
+import { allowed } from "../../../packages/shared/index.js";
+import {
+  inputSchema,
+  MAX_FRAME_BYTES,
+} from "../../../packages/protocol/index.js";
+import {
+  token,
+  digest,
+  seal,
+  unseal,
+  signGrant,
+  verifyProof,
+} from "./security.js";
+type Run = <T>(org: string, fn: (db: DB) => Promise<T>) => Promise<T>;
+type Options = {
+  db: DB;
+  run: Run;
+  origin: string;
+  mfaKey: Buffer;
+  signingKey: string;
+  publicKey: string;
+  production?: boolean;
+  deliverReset?: (email: string, token: string) => Promise<void>;
+};
+const uuid = z.string().uuid();
+const fail = (code: number, message: string) =>
+  Object.assign(new Error(message), { statusCode: code });
+const one = async (db: DB, q: string, p: any[] = []) =>
+  (await db.query(q, p)).rows[0];
+export async function createApp(o: Options) {
+  if (o.mfaKey.length !== 32) throw new Error("MFA key must be 32 bytes");
+  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
+  await app.register(cookie);
+  await app.register(helmet);
+  await app.register(rateLimit, {
+    max: 120,
+    timeWindow: "1 minute",
+    keyGenerator: (req) => req.ip ?? "unknown",
+  });
+  await app.register(websocket, { options: { maxPayload: MAX_FRAME_BYTES } });
+  await app.register(swagger, {
+    openapi: { info: { title: "NEXORA Remote API", version: "0.1.0" } },
+  });
+  await app.register(swaggerUI, { routePrefix: "/api/docs" });
+  const agents = new Map<string, WebSocket>();
+  const viewers = new Map<string, WebSocket>();
+  const sessionDevices = new Map<string, string>();
+  const challenges = new Map<string, { device: string; expires: number }>();
+  const tickets = new Map<
+    string,
+    { side: "agent" | "viewer"; id: string; expires: number }
+  >();
+  const sweep = setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of challenges) if (v.expires < now) challenges.delete(k);
+    for (const [k, v] of tickets) if (v.expires < now) tickets.delete(k);
+  }, 10000);
+  sweep.unref();
+  const closeSession = (s: string) => {
+    viewers.get(s)?.close(1000, "Session ended");
+    viewers.delete(s);
+    const device = sessionDevices.get(s);
+    const agent = device ? agents.get(device) : undefined;
+    if (agent?.readyState === 1)
+      agent.send(JSON.stringify({ type: "revoke", sessionId: s }));
+    sessionDevices.delete(s);
+  };
+  app.addHook("onClose", async () => {
+    clearInterval(sweep);
+    for (const a of agents.values()) a.close();
+    for (const v of viewers.values()) v.close();
+  });
+  app.setErrorHandler((e, _req, reply) => {
+    const err = e as Error & { statusCode?: number };
+    reply.code(e instanceof ZodError ? 400 : (err.statusCode ?? 500)).send({
+      error:
+        e instanceof ZodError
+          ? "Invalid request"
+          : err.statusCode && err.statusCode < 500
+            ? err.message
+            : "Internal server error",
+    });
+  });
+  app.addHook("onRequest", async (req) => {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+      req.cookies.nr_session &&
+      req.headers.origin !== o.origin
+    )
+      throw fail(403, "Invalid origin");
+  });
+  async function user(req: any) {
+    const raw = req.cookies.nr_session;
+    if (!raw) throw fail(401, "Login required");
+    const u = await one(
+      o.db,
+      "SELECT u.id,u.email,u.mfa_secret,u.platform_admin FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id_hash=$1 AND s.expires_at>now()",
+      [digest(raw)],
+    );
+    if (!u) throw fail(401, "Session expired");
+    return u;
+  }
+  async function scope(req: any, permission?: string) {
+    const u = await user(req);
+    const org = uuid.parse(req.headers["x-organization-id"]);
+    const member = await o.run(org, (db) =>
+      one(db, "SELECT role FROM memberships WHERE org_id=$1 AND user_id=$2", [
+        org,
+        u.id,
+      ]),
+    );
+    if (!member || (permission && !allowed(member.role, permission)))
+      throw fail(403, "Permission denied");
+    return { u, org, role: member.role };
+  }
+  async function audit(
+    db: DB,
+    org: string,
+    actor: string,
+    event: string,
+    target?: string,
+  ) {
+    await db.query(
+      "INSERT INTO audit_logs(org_id,actor_id,event,target_id) VALUES($1,$2,$3,$4)",
+      [org, actor, event, target ?? null],
+    );
+  }
+  async function endUserSessions(userId: string) {
+    const orgs = (await o.db.query("SELECT id FROM organizations")).rows;
+    for (const org of orgs)
+      await o.run(org.id, async (db) => {
+        const ended = await db.query(
+          "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND user_id=$2 AND state<>'ended' RETURNING id",
+          [org.id, userId],
+        );
+        for (const row of ended.rows) closeSession(row.id);
+      });
+  }
+  app.get("/api/health", async () => ({ status: "ok", protocol: 1 }));
+  app.post(
+    "/api/auth/login",
+    { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } },
+    async (req, reply) => {
+      const b = z
+        .object({
+          email: z.email(),
+          password: z.string().max(256),
+          otp: z.string().optional(),
+        })
+        .parse(req.body);
+      const u = await one(o.db, "SELECT * FROM users WHERE email=$1", [
+        b.email.toLowerCase(),
+      ]);
+      if (!u || !(await argon2.verify(u.password_hash, b.password)))
+        throw fail(401, "Invalid credentials");
+      if (u.mfa_secret) {
+        const t = new TOTP({
+          secret: Secret.fromBase32(unseal(u.mfa_secret, o.mfaKey)),
+        });
+        if (!b.otp || t.validate({ token: b.otp, window: 0 }) === null)
+          throw fail(401, "MFA code required or invalid");
+        const counter = Math.floor(Date.now() / 30000);
+        const used = await o.db.query(
+          "UPDATE users SET mfa_counter=$1 WHERE id=$2 AND (mfa_counter IS NULL OR mfa_counter<$1) RETURNING id",
+          [counter, u.id],
+        );
+        if (!used.rows.length) throw fail(401, "MFA code already used");
+      }
+      const s = token();
+      await o.db.query(
+        "INSERT INTO auth_sessions(id_hash,user_id,expires_at) VALUES($1,$2,now()+interval '8 hours')",
+        [digest(s), u.id],
+      );
+      reply.setCookie("nr_session", s, {
+        httpOnly: true,
+        secure: !!o.production,
+        sameSite: "strict",
+        path: "/",
+        maxAge: 28800,
+      });
+      return { id: u.id, email: u.email };
+    },
+  );
+  app.get("/api/auth/me", async (req) => {
+    const u = await user(req);
+    return { id: u.id, email: u.email, mfaEnabled: !!u.mfa_secret };
+  });
+  app.post("/api/auth/logout", async (req, reply) => {
+    if (req.cookies.nr_session) {
+      const current = await user(req);
+      await o.db.query("DELETE FROM auth_sessions WHERE id_hash=$1", [
+        digest(req.cookies.nr_session),
+      ]);
+      await endUserSessions(current.id);
+    }
+    reply.clearCookie("nr_session", { path: "/" });
+    return { ok: true };
+  });
+  app.get("/api/auth/sessions", async (req) => {
+    const u = await user(req);
+    return (
+      await o.db.query(
+        "SELECT id_hash,created_at,expires_at FROM auth_sessions WHERE user_id=$1",
+        [u.id],
+      )
+    ).rows;
+  });
+  app.delete("/api/auth/sessions", async (req) => {
+    const u = await user(req);
+    await o.db.query("DELETE FROM auth_sessions WHERE user_id=$1", [u.id]);
+    await endUserSessions(u.id);
+    return { ok: true };
+  });
+  app.post(
+    "/api/auth/forgot",
+    { config: { rateLimit: { max: 3, timeWindow: "1 minute" } } },
+    async (req) => {
+      const b = z.object({ email: z.email() }).parse(req.body);
+      if (!o.deliverReset)
+        throw fail(503, "Password reset delivery is not configured");
+      const u = await one(o.db, "SELECT id FROM users WHERE email=$1", [
+        b.email.toLowerCase(),
+      ]);
+      if (u) {
+        const t = token();
+        await o.db.query(
+          "INSERT INTO password_resets VALUES($1,$2,now()+interval '15 minutes',NULL)",
+          [digest(t), u.id],
+        );
+        await o.deliverReset(b.email, t);
+      }
+      return { ok: true };
+    },
+  );
+  app.post("/api/auth/reset", async (req) => {
+    const b = z
+      .object({
+        token: z.string().min(32),
+        password: z.string().min(12).max(256),
+      })
+      .parse(req.body);
+    const row = await one(
+      o.db,
+      "UPDATE password_resets SET used_at=now() WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING user_id",
+      [digest(b.token)],
+    );
+    if (!row) throw fail(400, "Invalid reset token");
+    await o.db.query("UPDATE users SET password_hash=$1 WHERE id=$2", [
+      await argon2.hash(b.password, { type: argon2.argon2id }),
+      row.user_id,
+    ]);
+    await o.db.query("DELETE FROM auth_sessions WHERE user_id=$1", [
+      row.user_id,
+    ]);
+    await endUserSessions(row.user_id);
+    return { ok: true };
+  });
+  app.post("/api/auth/mfa/setup", async (req) => {
+    const u = await user(req);
+    if (u.mfa_secret) throw fail(409, "MFA already enabled");
+    const t = new TOTP({ issuer: "NEXORA Remote", label: u.email });
+    await o.db.query(
+      "UPDATE users SET pending_mfa=$1,pending_mfa_expires=now()+interval '10 minutes' WHERE id=$2",
+      [seal(t.secret.base32, o.mfaKey), u.id],
+    );
+    return { uri: t.toString(), secret: t.secret.base32 };
+  });
+  app.post(
+    "/api/auth/mfa/confirm",
+    { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } },
+    async (req) => {
+      const u = await user(req);
+      const b = z.object({ otp: z.string().length(6) }).parse(req.body);
+      const row = await one(
+        o.db,
+        "SELECT pending_mfa FROM users WHERE id=$1 AND pending_mfa_expires>now()",
+        [u.id],
+      );
+      if (
+        !row?.pending_mfa ||
+        new TOTP({
+          secret: Secret.fromBase32(unseal(row.pending_mfa, o.mfaKey)),
+        }).validate({ token: b.otp, window: 0 }) === null
+      )
+        throw fail(400, "Invalid MFA code");
+      await o.db.query(
+        "UPDATE users SET mfa_secret=pending_mfa,pending_mfa=NULL WHERE id=$1",
+        [u.id],
+      );
+      return { ok: true };
+    },
+  );
+  app.get("/api/organizations", async (req) => {
+    const u = await user(req);
+    /* RLS: enumerate organizations through per-org membership transactions. */ const all =
+      (await o.db.query("SELECT id,name FROM organizations ORDER BY name"))
+        .rows;
+    const result = [];
+    for (const org of all) {
+      const m = await o.run(org.id, (db) =>
+        one(db, "SELECT role FROM memberships WHERE org_id=$1 AND user_id=$2", [
+          org.id,
+          u.id,
+        ]),
+      );
+      if (m) result.push({ ...org, role: m.role });
+    }
+    return result;
+  });
+  app.post("/api/organizations", async (req) => {
+    const u = await user(req);
+    const b = z.object({ name: z.string().min(1).max(120) }).parse(req.body);
+    const id = randomUUID();
+    await o.db.query("INSERT INTO organizations(id,name) VALUES($1,$2)", [
+      id,
+      b.name,
+    ]);
+    await o.run(id, async (db) => {
+      await db.query("INSERT INTO memberships VALUES($1,$2,'owner')", [
+        id,
+        u.id,
+      ]);
+      await audit(db, id, u.id, "organization.created", id);
+    });
+    return { id, name: b.name };
+  });
+  app.patch("/api/organization", async (req) => {
+    const { org, u } = await scope(req, "settings");
+    const b = z.object({ name: z.string().min(1).max(120) }).parse(req.body);
+    return o.run(org, async (db) => {
+      await db.query("UPDATE organizations SET name=$1 WHERE id=$2", [
+        b.name,
+        org,
+      ]);
+      await audit(db, org, u.id, "organization.updated", org);
+      return { ok: true };
+    });
+  });
+  app.get("/api/platform/users", async (req) => {
+    const u = await user(req);
+    if (!u.platform_admin) throw fail(403, "Platform administrator required");
+    return (
+      await o.db.query(
+        "SELECT id,email,platform_admin,created_at FROM users ORDER BY created_at DESC LIMIT 200",
+      )
+    ).rows;
+  });
+  app.post("/api/platform/users", async (req) => {
+    const u = await user(req);
+    if (!u.platform_admin) throw fail(403, "Platform administrator required");
+    const b = z
+      .object({ email: z.email(), password: z.string().min(12).max(256) })
+      .parse(req.body);
+    const id = randomUUID();
+    await o.db.query(
+      "INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3)",
+      [
+        id,
+        b.email.toLowerCase(),
+        await argon2.hash(b.password, { type: argon2.argon2id }),
+      ],
+    );
+    return { id, email: b.email };
+  });
+  app.get("/api/platform/settings", async (req) => {
+    const u = await user(req);
+    if (!u.platform_admin) throw fail(403, "Platform administrator required");
+    return {
+      protocol: 1,
+      sessionMinutes: 5,
+      frameTransport: "JPEG over WebSocket relay",
+      passwordResetDelivery: !!o.deliverReset,
+      serviceMode: false,
+      fileTransfer: false,
+      clipboard: false,
+    };
+  });
+  app.get("/api/devices/:id", async (req) => {
+    const { org } = await scope(req, "view");
+    const id = uuid.parse((req.params as any).id);
+    const d = await o.run(org, (db) =>
+      one(
+        db,
+        "SELECT id,name,group_id,os,agent_version,last_seen,revoked_at,capabilities FROM devices WHERE org_id=$1 AND id=$2",
+        [org, id],
+      ),
+    );
+    if (!d) throw fail(404, "Device not found");
+    return { ...d, online: agents.has(id) };
+  });
+  app.patch("/api/devices/:id", async (req) => {
+    const { org, u } = await scope(req, "devices");
+    const id = uuid.parse((req.params as any).id);
+    const b = z
+      .object({ name: z.string().min(1).max(120), groupId: uuid.nullable() })
+      .parse(req.body);
+    return o.run(org, async (db) => {
+      if (
+        b.groupId &&
+        !(await one(
+          db,
+          "SELECT id FROM device_groups WHERE org_id=$1 AND id=$2",
+          [org, b.groupId],
+        ))
+      )
+        throw fail(404, "Group not found");
+      const d = await one(
+        db,
+        "UPDATE devices SET name=$1,group_id=$2 WHERE org_id=$3 AND id=$4 RETURNING id",
+        [b.name, b.groupId, org, id],
+      );
+      if (!d) throw fail(404, "Device not found");
+      await audit(db, org, u.id, "device.updated", id);
+      return { ok: true };
+    });
+  });
+  app.get("/api/devices", async (req) => {
+    const { org } = await scope(req, "view");
+    return o.run(org, async (db) =>
+      (
+        await db.query(
+          "SELECT id,name,os,agent_version,last_seen,revoked_at,group_id,capabilities FROM devices WHERE org_id=$1 ORDER BY name",
+          [org],
+        )
+      ).rows.map((d) => ({ ...d, online: agents.has(d.id) })),
+    );
+  });
+  app.get("/api/groups", async (req) => {
+    const { org } = await scope(req, "view");
+    return o.run(
+      org,
+      async (db) =>
+        (
+          await db.query(
+            "SELECT * FROM device_groups WHERE org_id=$1 ORDER BY name",
+            [org],
+          )
+        ).rows,
+    );
+  });
+  app.post("/api/groups", async (req) => {
+    const { org, u } = await scope(req, "devices");
+    const b = z.object({ name: z.string().min(1).max(80) }).parse(req.body);
+    return o.run(org, async (db) => {
+      const id = randomUUID();
+      await db.query("INSERT INTO device_groups VALUES($1,$2,$3)", [
+        id,
+        org,
+        b.name,
+      ]);
+      await audit(db, org, u.id, "group.created", id);
+      return { id, ...b };
+    });
+  });
+  app.get("/api/members", async (req) => {
+    const { org } = await scope(req, "users");
+    return o.run(
+      org,
+      async (db) =>
+        (
+          await db.query(
+            "SELECT u.id,u.email,m.role FROM memberships m JOIN users u ON u.id=m.user_id WHERE m.org_id=$1",
+            [org],
+          )
+        ).rows,
+    );
+  });
+  app.post("/api/members", async (req) => {
+    const { org, u, role } = await scope(req, "users");
+    const b = z
+      .object({
+        email: z.email(),
+        role: z.enum(["admin", "technician", "employee", "viewer"]),
+      })
+      .parse(req.body);
+    if (role !== "owner" && b.role === "admin")
+      throw fail(403, "Only owner can appoint admin");
+    const target = await one(o.db, "SELECT id FROM users WHERE email=$1", [
+      b.email.toLowerCase(),
+    ]);
+    if (!target) throw fail(404, "User must be provisioned first");
+    return o.run(org, async (db) => {
+      await db.query("INSERT INTO memberships VALUES($1,$2,$3)", [
+        org,
+        target.id,
+        b.role,
+      ]);
+      await audit(db, org, u.id, "member.added", target.id);
+      return { ok: true };
+    });
+  });
+  app.patch("/api/members/:id", async (req) => {
+    const { org, u, role } = await scope(req, "users");
+    const id = uuid.parse((req.params as any).id);
+    const b = z
+      .object({ role: z.enum(["admin", "technician", "employee", "viewer"]) })
+      .parse(req.body);
+    return o.run(org, async (db) => {
+      const old = await one(
+        db,
+        "SELECT role FROM memberships WHERE org_id=$1 AND user_id=$2 FOR UPDATE",
+        [org, id],
+      );
+      if (!old) throw fail(404, "Member not found");
+      if (
+        old.role === "owner" ||
+        (role !== "owner" && (old.role === "admin" || b.role === "admin"))
+      )
+        throw fail(403, "Protected role");
+      await db.query(
+        "UPDATE memberships SET role=$1 WHERE org_id=$2 AND user_id=$3",
+        [b.role, org, id],
+      );
+      const ended = await db.query(
+        "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND user_id=$2 AND state<>'ended' RETURNING id",
+        [org, id],
+      );
+      ended.rows.forEach((s) => closeSession(s.id));
+      await audit(db, org, u.id, "member.role_changed", id);
+      return { ok: true };
+    });
+  });
+  app.get("/api/roles", async (req) => {
+    await scope(req);
+    return (
+      await o.db.query(
+        "SELECT role,permission FROM role_permissions ORDER BY role,permission",
+      )
+    ).rows;
+  });
+  app.post("/api/enrollments", async (req) => {
+    const { org, u } = await scope(req, "devices");
+    const t = token();
+    const id = randomUUID();
+    await o.run(org, async (db) => {
+      await db.query(
+        "INSERT INTO device_enrollments(id,org_id,token_hash,expires_at,created_by) VALUES($1,$2,$3,now()+interval '10 minutes',$4)",
+        [id, org, digest(t), u.id],
+      );
+      await audit(db, org, u.id, "enrollment.created", id);
+    });
+    return { id, organizationId: org, token: t, expiresIn: 600 };
+  });
+  app.post(
+    "/api/agent/enroll",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (req) => {
+      const b = z
+        .object({
+          organizationId: uuid,
+          token: z.string().min(32),
+          name: z.string().min(1).max(120),
+          publicKey: z.string().max(4096),
+          os: z.string().max(120),
+          version: z.string().max(40),
+        })
+        .parse(req.body);
+      try {
+        const k = createPublicKey(b.publicKey);
+        if (
+          k.asymmetricKeyType !== "rsa" ||
+          (k.asymmetricKeyDetails?.modulusLength ?? 0) < 3072
+        )
+          throw 0;
+      } catch {
+        throw fail(400, "RSA key >=3072 bits required");
+      }
+      return o.run(b.organizationId, async (db) => {
+        const e = await one(
+          db,
+          "UPDATE device_enrollments SET used_at=now() WHERE org_id=$1 AND token_hash=$2 AND used_at IS NULL AND expires_at>now() RETURNING id,created_by",
+          [b.organizationId, digest(b.token)],
+        );
+        if (!e) throw fail(403, "Invalid enrollment");
+        const id = randomUUID();
+        await db.query(
+          "INSERT INTO devices(id,org_id,name,public_key,os,agent_version,capabilities) VALUES($1,$2,$3,$4,$5,$6,$7)",
+          [
+            id,
+            b.organizationId,
+            b.name,
+            b.publicKey,
+            b.os,
+            b.version,
+            JSON.stringify(["jpeg", "input-v1"]),
+          ],
+        );
+        await audit(db, b.organizationId, e.created_by, "device.enrolled", id);
+        return { id, serverPublicKey: o.publicKey };
+      });
+    },
+  );
+  app.delete("/api/devices/:id", async (req) => {
+    const { org, u } = await scope(req, "devices");
+    const id = uuid.parse((req.params as any).id);
+    return o.run(org, async (db) => {
+      const d = await one(
+        db,
+        "UPDATE devices SET revoked_at=now() WHERE org_id=$1 AND id=$2 RETURNING id",
+        [org, id],
+      );
+      if (!d) throw fail(404, "Device not found");
+      const ended = await db.query(
+        "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+        [org, id],
+      );
+      ended.rows.forEach((s) => closeSession(s.id));
+      agents.get(id)?.close(1008, "Trust revoked");
+      agents.delete(id);
+      await audit(db, org, u.id, "device.revoked", id);
+      return { ok: true };
+    });
+  });
+  app.post("/api/agent/challenge", async (req) => {
+    const b = z.object({ deviceId: uuid }).parse(req.body);
+    if (challenges.size > 10000) throw fail(429, "Try later");
+    const n = token();
+    challenges.set(n, { device: b.deviceId, expires: Date.now() + 30000 });
+    return { nonce: n };
+  });
+  app.post("/api/agent/prove", async (req) => {
+    const b = z
+      .object({
+        deviceId: uuid,
+        organizationId: uuid,
+        nonce: z.string(),
+        signature: z.string().max(2048),
+      })
+      .parse(req.body);
+    const n = challenges.get(b.nonce);
+    challenges.delete(b.nonce);
+    if (!n || n.device !== b.deviceId || n.expires < Date.now())
+      throw fail(403, "Invalid challenge");
+    const d = await o.run(b.organizationId, (db) =>
+      one(
+        db,
+        "SELECT public_key FROM devices WHERE org_id=$1 AND id=$2 AND revoked_at IS NULL",
+        [b.organizationId, b.deviceId],
+      ),
+    );
+    if (!d || !verifyProof(d.public_key, b.nonce, b.signature))
+      throw fail(403, "Invalid proof");
+    const t = token();
+    tickets.set(digest(t), {
+      side: "agent",
+      id: b.organizationId + ":" + b.deviceId,
+      expires: Date.now() + 15000,
+    });
+    return { ticket: t };
+  });
+  app.post("/api/sessions", async (req) => {
+    const b = z
+      .object({ deviceId: uuid, mode: z.enum(["view", "control"]) })
+      .parse(req.body);
+    const { org, u } = await scope(req, b.mode);
+    return o.run(org, async (db) => {
+      const d = await one(
+        db,
+        "SELECT id FROM devices WHERE org_id=$1 AND id=$2 AND revoked_at IS NULL FOR UPDATE",
+        [org, b.deviceId],
+      );
+      if (!d) throw fail(404, "Device not found");
+      if (!agents.has(d.id)) throw fail(409, "Device is offline");
+      if (
+        await one(
+          db,
+          "SELECT id FROM remote_sessions WHERE org_id=$1 AND device_id=$2 AND state<>'ended' AND expires_at>now()",
+          [org, d.id],
+        )
+      )
+        throw fail(409, "Device already in session");
+      const id = randomUUID();
+      const expires = Date.now() + 5 * 60 * 1000;
+      await db.query(
+        "INSERT INTO remote_sessions(id,org_id,device_id,user_id,mode,state,expires_at,auth_session_hash) VALUES($1,$2,$3,$4,$5,'authorized',$6,$7)",
+        [
+          id,
+          org,
+          d.id,
+          u.id,
+          b.mode,
+          new Date(expires),
+          digest(req.cookies.nr_session!),
+        ],
+      );
+      await db.query("INSERT INTO session_permissions VALUES($1,$2,$3)", [
+        org,
+        id,
+        b.mode,
+      ]);
+      await audit(db, org, u.id, "session.authorized", id);
+      return { id, expiresAt: expires };
+    });
+  });
+  app.get("/api/sessions", async (req) => {
+    const { org } = await scope(req, "view");
+    return o.run(
+      org,
+      async (db) =>
+        (
+          await db.query(
+            "SELECT id,device_id,user_id,mode,state,created_at,expires_at,ended_at FROM remote_sessions WHERE org_id=$1 ORDER BY created_at DESC LIMIT 200",
+            [org],
+          )
+        ).rows,
+    );
+  });
+  app.delete("/api/sessions/:id", async (req) => {
+    const { org, u } = await scope(req, "terminate");
+    const id = uuid.parse((req.params as any).id);
+    return o.run(org, async (db) => {
+      const s = await one(
+        db,
+        "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2 RETURNING id",
+        [org, id],
+      );
+      if (!s) throw fail(404, "Session not found");
+      closeSession(id);
+      await audit(db, org, u.id, "session.ended", id);
+      return { ok: true };
+    });
+  });
+  app.post("/api/sessions/:id/ticket", async (req) => {
+    const { org, u } = await scope(req, "view");
+    const id = uuid.parse((req.params as any).id);
+    const s = await o.run(org, (db) =>
+      one(
+        db,
+        "SELECT * FROM remote_sessions WHERE org_id=$1 AND id=$2 AND user_id=$3 AND state<>'ended' AND expires_at>now()",
+        [org, id, u.id],
+      ),
+    );
+    if (!s) throw fail(403, "Session unavailable");
+    const t = token();
+    tickets.set(digest(t), {
+      side: "viewer",
+      id: org + ":" + id,
+      expires: Date.now() + 15000,
+    });
+    return { ticket: t };
+  });
+  app.get("/api/audit", async (req) => {
+    const { org } = await scope(req, "audit");
+    return o.run(
+      org,
+      async (db) =>
+        (
+          await db.query(
+            "SELECT * FROM audit_logs WHERE org_id=$1 ORDER BY id DESC LIMIT 200",
+            [org],
+          )
+        ).rows,
+    );
+  });
+  app.get("/api/plans", async (req) => {
+    await user(req);
+    return (await o.db.query("SELECT * FROM plans")).rows;
+  });
+  app.get("/api/subscription", async (req) => {
+    const { org } = await scope(req);
+    return o
+      .run(org, (db) =>
+        one(db, "SELECT * FROM subscriptions WHERE org_id=$1", [org]),
+      )
+      .then((x) => x ?? null);
+  });
+  app.get("/api/agent-versions", async (req) => {
+    await user(req);
+    return (await o.db.query("SELECT * FROM agent_versions")).rows;
+  });
+  async function validSession(org: string, id: string) {
+    return o.run(org, async (db) =>
+      one(
+        db,
+        "SELECT s.* FROM remote_sessions s JOIN devices d ON d.id=s.device_id AND d.org_id=s.org_id JOIN auth_sessions login ON login.id_hash=s.auth_session_hash AND login.expires_at>now() JOIN memberships m ON m.org_id=s.org_id AND m.user_id=s.user_id WHERE s.org_id=$1 AND s.id=$2 AND s.state<>'ended' AND s.expires_at>now() AND d.revoked_at IS NULL AND EXISTS(SELECT 1 FROM role_permissions rp WHERE rp.role=m.role AND rp.permission=s.mode)",
+        [org, id],
+      ),
+    );
+  }
+  app.get("/api/socket", { websocket: true }, (ws, req) => {
+    void (async () => {
+      if (req.headers.origin && req.headers.origin !== o.origin) {
+        ws.close(1008);
+        return;
+      }
+      const t = z.object({ ticket: z.string() }).safeParse(req.query);
+      if (!t.success) {
+        ws.close(1008);
+        return;
+      }
+      const ticket = tickets.get(digest(t.data.ticket));
+      tickets.delete(digest(t.data.ticket));
+      if (!ticket || ticket.expires < Date.now()) {
+        ws.close(1008);
+        return;
+      }
+      const [org, id] = ticket.id.split(":");
+      if (ticket.side === "agent") {
+        const d = await o.run(org, (db) =>
+          one(
+            db,
+            "SELECT id FROM devices WHERE org_id=$1 AND id=$2 AND revoked_at IS NULL",
+            [org, id],
+          ),
+        );
+        if (!d) {
+          ws.close(1008);
+          return;
+        }
+        agents.get(id)?.close(1000, "Reconnected");
+        agents.set(id, ws);
+        await o.run(org, (db) =>
+          db.query(
+            "UPDATE devices SET last_seen=now() WHERE org_id=$1 AND id=$2",
+            [org, id],
+          ),
+        );
+        let lastPing = Date.now();
+        const watchdog = setInterval(() => {
+          if (Date.now() - lastPing > 30000)
+            ws.close(1001, "Heartbeat timeout");
+        }, 10000);
+        watchdog.unref();
+        let busy = false;
+        ws.on("message", (data, isBinary) => {
+          if (busy) return;
+          busy = true;
+          void (async () => {
+            if (!isBinary) {
+              if (data.toString() === "ping") {
+                lastPing = Date.now();
+                await o.run(org, (db) =>
+                  db.query(
+                    "UPDATE devices SET last_seen=now() WHERE org_id=$1 AND id=$2 AND revoked_at IS NULL",
+                    [org, id],
+                  ),
+                );
+                ws.send("pong");
+              }
+              return;
+            }
+            const bytes = Buffer.from(data as Buffer);
+            if (bytes.length < 38 || bytes.length > MAX_FRAME_BYTES) return;
+            const sid = bytes.subarray(0, 36).toString();
+            if (!uuid.safeParse(sid).success) return;
+            const s = await validSession(org, sid);
+            if (!s || s.device_id !== id) return;
+            const viewer = viewers.get(sid);
+            if (
+              viewer?.readyState === 1 &&
+              viewer.bufferedAmount < MAX_FRAME_BYTES
+            )
+              viewer.send(bytes.subarray(36), { binary: true });
+          })()
+            .catch(() => ws.close(1011))
+            .finally(() => {
+              busy = false;
+            });
+        });
+        ws.on("close", () => {
+          clearInterval(watchdog);
+          if (agents.get(id) === ws) {
+            agents.delete(id);
+            void o.run(org, async (db) => {
+              const rows = await db.query(
+                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+                [org, id],
+              );
+              rows.rows.forEach((s) => closeSession(s.id));
+            });
+          }
+        });
+      } else {
+        const s = await validSession(org, id);
+        if (!s || !agents.has(s.device_id)) {
+          ws.close(1008);
+          return;
+        }
+        viewers.get(id)?.close(1000, "Replaced");
+        viewers.set(id, ws);
+        sessionDevices.set(id, s.device_id);
+        await o.run(org, (db) =>
+          db.query(
+            "UPDATE remote_sessions SET state='active' WHERE org_id=$1 AND id=$2",
+            [org, id],
+          ),
+        );
+        const grant = signGrant(
+          {
+            sessionId: id,
+            deviceId: s.device_id,
+            organizationId: org,
+            mode: s.mode,
+            expiresAt: new Date(s.expires_at).getTime(),
+            protocol: 1,
+          },
+          o.signingKey,
+        );
+        agents.get(s.device_id)!.send(JSON.stringify({ type: "grant", grant }));
+        let seq = 0,
+          pending = 0;
+        let queue = Promise.resolve();
+        ws.on("message", (data, binary) => {
+          if (binary || data.toString().length > 4096 || pending >= 128) {
+            ws.close(1008, "Invalid input or queue overflow");
+            return;
+          }
+          pending++;
+          queue = queue
+            .then(async () => {
+              if (ws.readyState !== 1) return;
+              const message = JSON.parse(data.toString());
+              if (
+                message.type === "ping" &&
+                typeof message.sentAt === "number"
+              ) {
+                ws.send(
+                  JSON.stringify({ type: "pong", sentAt: message.sentAt }),
+                );
+                return;
+              }
+              const e = inputSchema.safeParse(message);
+              if (!e.success || e.data.seq <= seq) return;
+              const current = await validSession(org, id);
+              if (!current || current.mode !== "control") {
+                ws.close(1008);
+                return;
+              }
+              seq = e.data.seq;
+              agents
+                .get(s.device_id)
+                ?.send(
+                  JSON.stringify({
+                    type: "input",
+                    sessionId: id,
+                    event: e.data,
+                  }),
+                );
+            })
+            .catch(() => ws.close(1008))
+            .finally(() => {
+              pending--;
+            });
+        });
+        const expiry = setTimeout(
+          () => {
+            closeSession(id);
+            void o.run(org, (db) =>
+              db.query(
+                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
+                [org, id],
+              ),
+            );
+          },
+          Math.max(0, new Date(s.expires_at).getTime() - Date.now()),
+        );
+        ws.on("close", () => {
+          clearTimeout(expiry);
+          if (viewers.get(id) === ws) {
+            viewers.delete(id);
+            sessionDevices.delete(id);
+            agents
+              .get(s.device_id)
+              ?.send(JSON.stringify({ type: "revoke", sessionId: id }));
+            void o.run(org, (db) =>
+              db.query(
+                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
+                [org, id],
+              ),
+            );
+          }
+        });
+      }
+    })().catch(() => ws.close(1008));
+  });
+  return app;
+}

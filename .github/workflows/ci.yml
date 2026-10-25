@@ -1,0 +1,75 @@
+name: Verify NEXORA Remote
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+      - uses: actions/upload-artifact@v4
+        with: { name: web-server-build, path: dist, retention-days: 14 }
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nexora_ci
+          POSTGRES_PASSWORD: ci-only-disposable
+          POSTGRES_DB: nexora_ci
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U nexora_ci" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: node --import tsx tests/postgres.integration.ts
+        env:
+          TEST_DATABASE_URL: postgres://nexora_ci:ci-only-disposable@127.0.0.1:5432/nexora_ci
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          { name: playwright-results, path: test-results, retention-days: 7 }
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "10.0.x" }
+      - run: dotnet build apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release
+      - run: dotnet run --project tests/agent-contract/Agent.Contract.csproj -c Release
+      - run: dotnet publish apps/windows-agent/Nexora.Agent/Nexora.Agent.csproj -c Release -r win-x64 --self-contained true -o artifacts/agent
+      - shell: pwsh
+        run: Copy-Item -Recurse docs/licenses artifacts/agent/licenses
+      - run: choco install innosetup --no-progress -y
+      - shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" apps/windows-agent/installer/Nexora.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-agent-unsigned-engineering-preview
+          path: |
+            artifacts/agent
+            artifacts/*-unsigned.exe
+          retention-days: 14

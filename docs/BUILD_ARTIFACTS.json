@@ -1,0 +1,11 @@
+{
+  "artifact": "NEXORA_Remote_Agent_win_x64_UNTESTED.zip",
+  "sha256": "e50efdecadb78a60d6d6b77068eb4339a6e05df8b80adea51567b6210ee80614",
+  "sizeBytes": 49929743,
+  "target": "win-x64",
+  "selfContained": true,
+  "signed": false,
+  "interactiveWindowsTested": false,
+  "installerBuilt": false,
+  "githubActionsRun": null
+}
