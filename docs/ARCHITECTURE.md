@@ -1,34 +1,32 @@
-# Architecture and decisions
+# Phase 2 architecture
 
-## Trust boundaries
+```mermaid
+flowchart TD
+  V["React viewer / organization dashboard"] -->|"HTTPS, cookie-bound WSS"| A["Fastify authorization and relay"]
+  A -->|"Tenant transaction + forced RLS"| D["PostgreSQL"]
+  S["NexoraRemote Windows Service / Session 0"] -->|"Outbound HTTPS proof + WSS"| A
+  S -->|"Bounded local pipe / PID + SID ACL"| W["Visible console-user worker"]
+  W -->|"GDI + JPEG / authorized SendInput"| U["Normal Windows desktop"]
+```
 
-Browser → same-origin HTTPS API / WSS relay → PostgreSQL. Agent → outbound HTTPS enrollment/proof → outbound WSS relay. The agent runs visibly in an authorized, logged-on user's session with `asInvoker`; it is not a service. Remote sessions can operate while that user is away if the application remains enabled and the normal desktop remains unlocked. Pre-logon unattended access is not implemented.
+## Existing monorepo preserved
 
-## Control plane
+React/Vite/TypeScript and Fastify/PostgreSQL remain. Migration 001 is unchanged; 002 adds default-enforced device ACLs and hashed MFA recovery records. Live sockets/tickets/presence are process-local: one backend instance is supported; horizontal relay/presence routing is not implemented.
 
-Login creates an opaque random session stored only as a SHA-256 digest. Each request resolves the authenticated user and the supplied organization membership; built-in role grants are checked independently of the UI. Tenant SQL uses a transaction and local `app.org_id`. Composite FKs prevent cross-tenant group/device/session relationships. Database isolation depends on a non-bypass runtime role; migration/admin credentials must never run the application.
+## Windows roles
 
-Organizations and global login identities are global tables. Only authorized API routes expose them. Tenant-owned tables enforce RLS. The application role can switch its tenant context by design; RLS complements API authorization, it does not protect against total compromise of the server process. A platform administrator has user-provisioning rights; it does not receive automatic tenant desktop access.
+One protected binary has explicit entry roles: `--service` runs ServiceBase without invoking interactive Windows capture; `--worker <random-pipe>` runs the visible console-session Form; `--configure-service` opens administrator-approved machine setup. Default per-user mode remains for direct validation/development. Machine startup is a visible automatic Windows service, not a hidden scheduled process.
 
-## Engine
+The service alone loads DPAPI LocalMachine identity under SYSTEM/Admin-only ProgramData ACL and performs outbound RSA proof/reconnect/heartbeat and signed grant verification. It obtains the active console user's primary token through WTSQueryUserToken and launches the fixed Program Files binary on `winsta0\\default` with CreateProcessAsUser. No Windows password, arbitrary command line, secure-desktop bypass or interactive Session 0 access is used. RDP/multi-user selection beyond the active console is not complete.
 
-1. An owner/admin issues a hashed one-time enrollment token.
-2. A visible agent generates RSA-3072 locally, enrolls its public key and pins the server grant-verification key received over authenticated HTTPS.
-3. Agent signs a fresh nonce and obtains a one-use socket ticket. An outbound connection registers live presence.
-4. Technician requests view/control. Server validates membership, device trust, mode and current availability, stores the session and its permissions.
-5. Browser exchanges its authenticated session for a socket ticket. Server sends a signed grant to the agent, which checks signature, identity, organization, mode, protocol and expiry.
-6. Agent captures primary screen using GDI `CopyFromScreen`, caps width at 1280, encodes JPEG quality 55 and prefixes the session UUID. Server checks the current DB authorization before forwarding each frame.
-7. Browser renders JPEG frames and sends monotonically sequenced normalized input. Server rechecks current session/role/device/login validity; agent rechecks signed grant, mode, sequence, expiry and desktop state before SendInput.
-8. Termination, role reduction, logout and device revocation close the viewer and send revocation; transport loss stops local access. Reconnection authenticates afresh and does not resurrect ended sessions.
+A random FirstPipeInstance pipe denies Network SID, allows only SYSTEM and target user, verifies the launched worker PID; worker checks the pipe server against SCM's service PID. Messages are length-prefixed JSON capped at 3 MiB with deadlines and serialized RPC. The worker receives public identity + signed grant only, independently checks signature/scope/expiry/mode/sequence, and captures/injects only on the normal desktop. Local opt-out is visible and persisted in that user's profile. Shutdown closes the pipe and releases input; service recovery is explicit SCM policy.
 
-## Performance
+## Session and transport
 
-Baseline 5 FPS target, 1–5 FPS adjustment based on local encode/send duration, width cap, frame size cap (2 MiB), one frame being validated at a time, slow-viewer buffer cap and frame dropping. This is a first transport, not a measured performance guarantee. JPEG over TCP has head-of-line blocking. There is no adaptive network estimation, packet-loss recovery, delta codec or H.264 encoder. Relay sees screen plaintext after TLS termination; no E2E media encryption is claimed. Server RTT is displayed separately from unavailable desktop input latency.
+REST login, organization role and device ACL authorize sessions. One-use browser tickets are login-cookie/Origin-bound and transported as a subprotocol; Agent tickets use Authorization. URL credentials are rejected. Signed grants use standard RSA/SHA-256, expire within five minutes and within the authorizing login. Inputs/frames check current DB grant, role, device trust and ACL. Replaced viewer sockets are checked before/after awaited DB reads. Revocation and reconnect never resurrect an old grant.
 
-## Data and deployment model
+Actual capture is still bounded GDI/JPEG with selected-screen geometry and conservative FPS adaptation. No WGC, DXGI, H.264 or WebRTC implementation is claimed. JPEG transport is relayed standard TLS in deployment, not E2E media encryption. Viewer measures decoded FPS/received bitrate/server RTT; separate Windows tests measure action-to-text-observation on loopback.
 
-A single server process owns the live agent/viewer/ticket maps. Horizontal scaling needs a presence store and relay routing; load-balancing these processes directly will not work. Restart loses live sockets/tickets and requires fresh sessions. PostgreSQL retains identity, session history and audit records. Migration `001` runs under a transaction and advisory lock.
+## Evidence scope
 
-## Scope choices
-
-GDI/JPEG is an explicitly limited baseline. Desktop Duplication or WGC and a standard video transport should be introduced behind capture/transport interfaces after Windows validation. No attempt is made to bypass Session 0, UIPI, UAC, endpoint protection or Windows sign-in. Service/broker integration is deferred rather than represented by a non-functional service.
+The automated direct-Agent loopback path uses the real server, RSA enrollment, signed grants, GDI/JPEG relay, SendInput, quality scaling and reauthentication. It does not exercise the full service→WTS worker→pipe path after machine enrollment/reboot, nor two physical devices over LAN/TLS. Native pipe/DPAPI checks and SCM install/start/stop/upgrade/uninstall are separate evidence. See phase2/CI_VERIFICATION.json and phase2/TWO_WINDOWS_KIT.md.

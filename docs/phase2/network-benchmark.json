@@ -1,0 +1,31 @@
+{
+  "scope": "Synthetic loopback WS application-frame shaping; not measured Windows performance or kernel packet loss",
+  "results": [
+    {
+      "profile": "baseline",
+      "receivedFrames": 6,
+      "injectedFrameDrops": 0,
+      "elapsedSeconds": 0.19470624099999997,
+      "receivedFramesPerSecond": 30.815653207541512,
+      "receivedKbps": 2019.5346486094406,
+      "cpuMs": 21.107,
+      "rssBytes": 79843328,
+      "reconnected": true,
+      "realDesktop": false,
+      "tcpPacketLossSimulated": false
+    },
+    {
+      "profile": "weak",
+      "receivedFrames": 4,
+      "injectedFrameDrops": 2,
+      "elapsedSeconds": 1.213953458,
+      "receivedFramesPerSecond": 3.295019239526727,
+      "receivedKbps": 215.94238088162356,
+      "cpuMs": 7.998,
+      "rssBytes": 80629760,
+      "reconnected": true,
+      "realDesktop": false,
+      "tcpPacketLossSimulated": false
+    }
+  ]
+}

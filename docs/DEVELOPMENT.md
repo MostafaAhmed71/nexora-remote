@@ -32,3 +32,13 @@ Playwright normally installs its Chromium on the runner. In this cloud task CDN 
 ## Development data
 
 No production seed exists. Test fixtures live exclusively in `tests/` and are ephemeral. E2E harness refuses `NODE_ENV=production`. Do not expose the harness or its fixture credentials beyond loopback. Schema reference rows (roles/permissions) are migration data, not example organizations/users/devices. Plans and releases remain empty unless an operator provisions them.
+
+## Phase 2 additions
+
+Protocol v2 intentionally rejects v1 URL tickets; update Agent/dashboard together. Run additive migration 002 after 001; the migrator discovers numbered SQL files in order. Existing/new devices now default to enforced ACLs. Runtime grants for the standard nexora_app role are extended by migration 002 if that role already exists.
+
+Machine installer 0.2 requires administrator approval and protected Program Files. It registers an automatic visible NexoraRemote service. Use its Start menu configuration UI for enrollment, never enter Windows credentials. SYSTEM/Admin-only ProgramData machine identity and per-user visible worker are separate. Legacy 0.1 per-user installation/key import is not automated. See phase2/TWO_WINDOWS_KIT.md.
+
+Optional RESET_DELIVERY_URL must be HTTPS and RESET_DELIVERY_BEARER must be supplied as an external secret. The adapter sends email/reset URL to the configured delivery service, refuses redirects, applies a timeout and is not active without configuration. No provider/account has been connected during this task. For MFA recovery, generate codes after password + TOTP and store them privately; each code is consumed once with the password.
+
+Windows validation starts an ephemeral loopback backend and tests only an owned disposable UI window if the runner has a safe interactive desktop. The test records whether it actually ran; no fixed success flag is inferred from buildability. Artifacts include windows-validation.json and synthetic network-benchmark.json. The test-only /**test**/drop-agents route exists solely in the guarded loopback harness, not the application entry point.

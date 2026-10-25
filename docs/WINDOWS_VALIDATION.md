@@ -1,20 +1,7 @@
-# Two Windows device validation gate
+# Current Windows validation gates
 
-**Not yet ready to approve an institutional pilot.** Private repository, self-contained x64 agent and unsigned installer exist. Windows CI build and isolated install/uninstall smoke checks passed in run 40180726012. Interactive agent runtime behavior has not been tested on Windows. No real school device was contacted.
+Phase 2 supersedes Phase 1's build-only status. Actual desktop capture, JPEG relay, Arabic Unicode input, mouse click, scaling, revocation and automatic direct-Agent reconnect have been exercised in an isolated Windows runner/loopback environment. Service install/start/stop/repair/uninstall and native pipe/DPAPI checks are separate automated gates.
 
-Future authorized setup: Windows target VM A with a normal logged-on test user and visible agent; Windows device B with a supported browser; a dedicated development backend/PostgreSQL with trusted local HTTPS. Do not disable TLS certificate validation, antivirus or UAC. Install/enable only with explicit authorization. No VPS is necessary for a closed lab; HTTPS trust and connectivity must be established by the lab operator.
+This is not a full machine-service→WTS worker→IPC→remote browser validation after enrollment/reboot, and it is not a two-Windows/LAN/TLS test. Secure desktop/UAC/logon are unsupported.
 
-Acceptance checklist (CI packaging gates 1–2 passed; interactive lab gates remain pending):
-
-1. PASSED IN CI: Windows runner builds and unsigned installer generation. Check the artifact hash in BUILD_ARTIFACTS.json and review unsigned preview status before lab use.
-2. PASSED IN CI: Installer appears under Installed Apps and Start menu, bundles runtime licenses, does not silently start Agent and removes executable/registry/shortcut on uninstall. Repeat on the chosen lab devices. DPAPI identity removal must be explicitly invoked from agent; server trust revocation remains independent.
-3. Enrollment generates local RSA key, consumes token once, shows device ID. Reject expired/wrong-organization token and observe no duplicate identity.
-4. Start visible agent manually; dashboard online; heartbeat loss goes offline within ~30 seconds. Disable access immediately stops connection. Restart/reconnect requires new authorization, not old grant replay.
-5. View-only session streams a real desktop and never injects input. Control session mouse, left/right buttons and supported keys work in a non-elevated test editor. Type Arabic and English; keyboard layout/IME limitations must be resolved rather than assumed correct.
-6. Change primary-screen resolution/DPI during stream; verify frame canvas dimensions and click mapping at all edges. Multiple monitors are not selectable in this version.
-7. Revoke trust, change role, logout, end session and let five-minute grant expire; verify no subsequent frame or input, held keys released. Repeat with half-open transport/network loss.
-8. Lock Windows, trigger UAC and switch user; agent must deny capture/input without crossing security desktops. No logon control is expected.
-9. Observe CPU, memory, FPS, bytes and actual input-to-screen latency on both low- and high-end devices. Exercise throttled network and buffer limits. No performance target is approved yet.
-10. Cross-tenant API/device/session probing and session token replays rejected; audit entries correspond to access lifecycle. Complete install/uninstall and reboot behavior; automatic startup/service unattended mode is not present.
-
-Only after passing these tests, security review and addressing high-risk findings should a two-device pilot be marked ready. Existing CI contract tests verify signatures and buildability; they do not substitute for these tests.
+Use [the current two-Windows kit](phase2/TWO_WINDOWS_KIT.md), [classification report](phase2/REPORT_AR.md), [CI evidence](phase2/CI_VERIFICATION.json) and [artifact hashes](BUILD_ARTIFACTS.json). The remaining lab cases include RDP/multi-user policy, physical display/DPI/monitor changes, full IME/shortcuts, long soak, network loss and independent security review. No school device is approved for this engineering validation.

@@ -1,0 +1,24 @@
+{
+  "sourceCommit": "b6cd077a7fb25610b25c8e7da73493332bab8d95",
+  "githubActionsRun": 40180726012,
+  "githubRunURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012",
+  "windowsArtifact": {
+    "id": 12593293420,
+    "name": "windows-agent-unsigned-engineering-preview",
+    "sha256": "c35b7b9748df6be2f3fc168bdb5085cf27f97f60b0401066560af4dddb00adb8",
+    "sizeBytes": 92509474,
+    "expiresAt": "2026-11-08"
+  },
+  "installer": {
+    "name": "NexoraRemote-0.1.0-win-x64-unsigned.exe",
+    "sha256": "1c976356544110a328d17ff67e87e4fc9eeec4537e3ffadeae31afc20b6896c5",
+    "sizeBytes": 41693917,
+    "builtOnWindows": true,
+    "signed": false,
+    "isolatedInstallUninstallSmokePassed": true,
+    "silentInstallLaunchesAgent": false
+  },
+  "target": "win-x64",
+  "selfContained": true,
+  "interactiveWindowsTested": false
+}

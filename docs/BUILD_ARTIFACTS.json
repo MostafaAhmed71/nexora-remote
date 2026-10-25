@@ -1,24 +1,28 @@
 {
-  "sourceCommit": "b6cd077a7fb25610b25c8e7da73493332bab8d95",
-  "githubActionsRun": 40180726012,
-  "githubRunURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012",
+  "phase": 2,
+  "sourceCommit": "7072a40efe11f47b016248a217b3a3e743ed4aeb",
+  "githubActionsRun": 40186778292,
+  "githubRunURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40186778292",
   "windowsArtifact": {
-    "id": 12593293420,
+    "id": 12596530331,
     "name": "windows-agent-unsigned-engineering-preview",
-    "sha256": "c35b7b9748df6be2f3fc168bdb5085cf27f97f60b0401066560af4dddb00adb8",
-    "sizeBytes": 92509474,
-    "expiresAt": "2026-11-08"
+    "sha256": "857c03af3f04578d2031e9ea26dcd5e0f05d7c13db5ede078907f7f12ea120ae",
+    "sizeBytes": 92639555,
+    "expiresAt": "2026-11-08T10:59:15Z",
+    "downloadURL": "https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40186778292/artifacts/12596530331"
   },
   "installer": {
-    "name": "NexoraRemote-0.1.0-win-x64-unsigned.exe",
-    "sha256": "1c976356544110a328d17ff67e87e4fc9eeec4537e3ffadeae31afc20b6896c5",
-    "sizeBytes": 41693917,
+    "name": "NexoraRemote-0.2.0-win-x64-unsigned.exe",
+    "sha256": "b9e2a631910b7a105708c15ea50929be98fa4fe0842634f1c2757d696f2d3f19",
+    "sizeBytes": 41747300,
     "builtOnWindows": true,
     "signed": false,
-    "isolatedInstallUninstallSmokePassed": true,
-    "silentInstallLaunchesAgent": false
+    "serviceLifecycleAndRepairUpgradeUninstallPassed": true,
+    "legacy01AutomaticMigration": false
   },
   "target": "win-x64",
   "selfContained": true,
-  "interactiveWindowsTested": false
+  "realWindowsLoopbackEngineValidated": true,
+  "twoWindowsValidated": false,
+  "serviceWorkerEndToEndValidated": false
 }

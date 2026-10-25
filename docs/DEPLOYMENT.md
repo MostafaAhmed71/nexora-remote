@@ -11,3 +11,9 @@
 9. Sign and verify installer, deliver only to approved test devices and document uninstall/revocation. No automatic public release; promote manually after review.
 
 No domain, firewall rule, VPS service, production account or public deployment was created during this task.
+
+## Phase 2 deployment gates
+
+Do not deploy directly from the engineering installer. Device ACL enforcement is now default-on; validate the migration/runtime-role grants and explicitly approve technician device access. Configure a real recovery-delivery provider and secret before promising recovery mail. Apply the protocol-v2 upgrade to browser, relay and Agent together. No signing certificate was created.
+
+Machine service setup is explicit and administrator-approved. Full WTS worker launch, protected IPC after machine enrollment/reboot and a two-device trusted HTTPS lab remain gates even though native pipe/DPAPI checks, the direct-agent loopback engine and service install/start/stop/repair/uninstall have automated evidence. No control of UAC/logon/secure desktop is supported. Follow phase2/TWO_WINDOWS_KIT.md and phase2/REPORT_AR.md before planning a pilot.

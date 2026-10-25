@@ -1,42 +1,33 @@
 # NEXORA Remote
 
-Secure Remote Desktop & Device Management Platform — **0.1.0 engineering preview, incomplete**.
+**0.2.0 engineering preview — Phase 2. Not approved for institutional use or sale.**
 
-This is application source, not a production-ready remote access product. No VPS, deployment, real device enrollment, real user provisioning, or public release has been performed. Repository: https://github.com/MostafaAhmed71/nexora-remote (private). Cloud build/test evidence is recorded under docs; GitHub CI status is tracked separately from interactive Windows verification.
+Continue the existing private repository: https://github.com/MostafaAhmed71/nexora-remote . No VPS, public deployment, school device or production identity has been used. Large build outputs live in Actions Artifacts, not Git.
 
-## Implemented
+## Phase 2 results
 
-- React/TypeScript/Vite Arabic RTL dashboard, responsive layout and light/dark appearance. Real API-backed login, MFA enrollment, organizations, memberships, roles, device/group lists, enrollment issuance, remote viewer, session history/termination, audit queries, account session revocation, platform-user provisioning and plan/version read views.
-- Fastify API with Argon2id, HttpOnly/SameSite cookies, strict origin checks for cookie mutations, rate limits, encrypted TOTP secrets, single-use reset tokens through an injectable delivery adapter, tenant authorization, revocation and structured validation.
-- PostgreSQL SQL migration with foreign keys, composite tenant keys, indexes and forced RLS. Explicit transaction-scoped tenant setting; deployment must use a NOSUPERUSER/NOBYPASSRLS runtime role.
-- RSA-3072 device identities; single-use ten-minute enrollment tokens; proof-of-possession challenges; fifteen-second single-use socket tickets; RSA-signed five-minute session grants.
-- Own engine: visible interactive .NET 10 Windows agent, primary-screen GDI capture, resized JPEG frames, authenticated WebSocket relay, browser canvas viewer, normalized mouse/button/key events through SendInput, sequence checks, grant validation and revocation. No third-party remote desktop engine.
-- DPAPI CurrentUser identity storage; reconnect with bounded exponential backoff; presence heartbeat/watchdog; release held input on disconnect/revoke; frame backpressure and a basic capture/send-time FPS adjustment. Viewer counts received frames/bytes and measures server RTT (not end-to-end input latency).
-- CI source for Node validation, native PostgreSQL checks, Playwright, Windows build, grant contract checks, self-contained publishing, unsigned Inno Setup installer and artifact uploads. No automatic releases or deployment.
+The Windows validation suite has exercised actual GDI desktop capture, JPEG relay through the real Fastify server, actual Arabic Unicode SendInput, a mouse click in an owned test window, encoded-resolution scaling, session revocation and automatic Agent proof/reconnect on a disposable Windows runner with a loopback backend. It is not a two-device/LAN/TLS or service-to-WTS-worker end-to-end test.
 
-## Verified GitHub CI
+Read the [Phase 2 report](docs/phase2/REPORT_AR.md), [machine-readable CI evidence](docs/phase2/CI_VERIFICATION.json), [security review](docs/phase2/SECURITY_REVIEW.md), [capture decision](docs/phase2/ENGINE_DECISION.md), [performance methodology](docs/phase2/PERFORMANCE.md) and [two-Windows lab kit](docs/phase2/TWO_WINDOWS_KIT.md). Phase 1 evidence remains historical under its original reports.
 
-[Run #3 — all four jobs succeeded](https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012): 28 unit/API/protocol tests, 3 browser tests, 5 native PostgreSQL 17 checks, 5 C# grant checks, web/server build, Windows agent build, unsigned installer creation and isolated silent install/uninstall smoke checks. [Windows build + installer artifact](https://github.com/MostafaAhmed71/nexora-remote/actions/runs/40180726012/artifacts/12593293420). This does not verify interactive desktop capture/input. Source-only documentation updates after the tested commit do not change executable behavior.
+## Executable components
 
-## Evidence and gaps
+| Component          | Implementation                                                                                                                                                                                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web                | React/TypeScript/Vite, Arabic RTL, responsive light/dark dashboard, device ACL editor, MFA recovery, live viewer with fullscreen/fit/frame size, quality/FPS/width/monitor controls, measured receive FPS/bitrate/server RTT and reauthorization/reconnect |
+| Server             | Fastify, PostgreSQL migrations, Argon2id/TOTP/one-use recovery codes, strict cookie origins, role + live device ACL, cookie-bound one-use socket tickets outside URLs, signed expiring grants, live-session input/frame checks                             |
+| Machine service    | Same protected Windows binary under `--service`: visible automatic NexoraRemote service, SYSTEM/Admin DPAPI machine identity, heartbeat/reconnect, structured bounded logs and SCM recovery                                                                |
+| Interactive worker | `--worker`: visible console-user window, local persistent opt-out, GDI/JPEG and SendInput, independently verified signed grants, bounded named-pipe messages bound to process identity and restricted SID ACL                                              |
+| Setup              | Administrator-approved Program Files installer, Start menu service configuration (`--configure-service`), start/stop/repair/uninstall tests; still unsigned                                                                                                |
 
-See [readiness report](docs/READINESS_AR.md), [architecture](docs/ARCHITECTURE.md), [security](docs/SECURITY.md), [protocol](docs/PROTOCOL.md), [development](docs/DEVELOPMENT.md), [Windows verification](docs/WINDOWS_VALIDATION.md), and [future deployment](docs/DEPLOYMENT.md).
+No third-party desktop engine is used. WGC/DXGI, H.264, WebRTC, file transfer and clipboard are not implemented. File/clipboard controls are explicitly disabled. UAC, secure desktop, elevated-app bypass and Windows logon control are unsupported. Multi-user/RDP policy, actual reboot/WTS worker lifecycle, physical resolution/DPI/monitor changes, complete IME behavior, production recovery-provider configuration and independent security review remain validation/product gates.
 
-No Windows Service, Session 0 broker, WGC/Desktop Duplication, WebRTC/H.264, secure desktop/logon access, multi-monitor selection, file transfer, clipboard, automatic updates, enforceable commercial licensing, or production password-reset delivery has been completed. Do not interpret a table or route for a future subsystem as a complete feature.
+## Development and protocol
 
-## Layout
+A single root npm lockfile and module-separated monorepo are preserved. `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`; `npm run test:e2e` starts only ephemeral loopback fixtures. Windows native and installer suites run in Actions. See [development](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md) and [protocol v2](docs/PROTOCOL.md).
 
-- `apps/web`: browser administration and desktop viewer.
-- `apps/server`: authentication, tenant API, device proof and relay.
-- `apps/windows-agent/Nexora.Agent`: visible per-user agent.
-- `packages/database`: PostgreSQL migration and tenant transaction helper.
-- `packages/protocol`, `packages/shared`: validation and built-in grants.
-- `tests`: isolated test installations and protocol/security checks.
-- `infrastructure`: development containers and explicit bootstrap.
-- `.github/workflows`: CI configuration for cloud verification.
+Migration 001 is preserved. Migration 002 adds forced-RLS device ACLs and hashed recovery codes. ACL enforcement defaults to enabled for legacy and new devices: owner/admin still need their tenant role, technicians additionally need explicit device grants. Run migrations with an owner role and the server with NOSUPERUSER/NOBYPASSRLS credentials. Never commit keys or `.env`.
 
-The workspace uses a single npm lockfile and root build; modules remain separated by directory. A package publishing/workspaces split is deferred until cross-project consumers exist. No empty UI package is included.
+Protocol v1 clients/URL tickets are rejected. Upgrade Agent and dashboard together. The old per-user 0.1 installation requires explicit removal/re-enrollment before the machine-service installer; no silent key import occurs. The current upgrade smoke test verifies repair/reinstall of the machine-service build, not automatic legacy conversion.
 
-## Ownership and third-party software
-
-Original application code is proprietary, all rights reserved; no redistribution license is granted by this repository. Dependencies retain their licenses. See `docs/THIRD_PARTY_LICENSES.md` and their distributed license texts. The engineering Windows build is unsigned and has not been executed on Windows.
+Original source is proprietary; third-party licenses and Microsoft runtime notices are preserved. The current workflows pin supported Node 24 Actions by commit SHA and do not publish Releases or deploy.

@@ -1,32 +1,11 @@
-# Security assessment — engineering preview
+# Current security assessment
 
-Implemented: Argon2id, random session/ticket/enrollment secrets stored hashed, encrypted TOTP secrets using AES-256-GCM with an external key, verified MFA setup and last-counter checks, strict same-site cookies, strict mutation origins, built-in RBAC, current membership checks, RLS and composite FKs, proof-of-possession and one-time challenges, session mode and sequence checks, revocation, audit of tenant administrative actions, visible agent and DPAPI CurrentUser storage. Production mode sets Secure cookies; termination must supply TLS in deployment.
+See [Phase 2 source/security review](phase2/SECURITY_REVIEW.md) for confirmed defects, fixes and regression mapping. Phase 1 evidence remains historical; this is not an independent penetration test.
 
-## Threat model
+Implemented controls: Argon2id, HttpOnly/SameSite cookies, strict mutation/browser socket Origin, hashed one-use enrollment/proof tickets and MFA recovery codes, encrypted TOTP secrets, role plus forced-RLS device ACL, composite tenant keys, login-bound socket tickets outside URLs, current-socket authorization before/after awaited work, signed expiring grants bounded to the authorizing login, bounded input/frame/IPC queues and explicit revocation.
 
-Protect against a user guessing a different tenant's device ID, a viewer attempting control, replayed enrollment/proof/ticket/input, an untrusted device using another identity, and stale access after role/trust changes. Rate limiting is per process/client IP and is not a substitute for a WAF or account lockout policy. Proxy trust must be configured narrowly; do not blindly trust arbitrary forwarded client IPs.
+Windows machine identity is DPAPI LocalMachine plus SYSTEM/Admin-only ProgramData DACL. The visible console-user worker has no private machine key. Its local pipe rejects Network SID, does not allow Everyone, binds the launched worker PID and verifies the server against the SCM process. Program Files/reparse checks protect service registration; another executable using the same service name is not silently reconfigured. These controls do not override Windows UAC/UIPI/Session 0 or protect against a compromised administrator.
 
-Trusted: application server, PostgreSQL operator, organization operators authorized to enroll, OS/user profile hosting the agent, TLS PKI and build pipeline. TLS terminator/relay can observe desktop content. Administrators can grant view of organization devices to members. There are no per-device ACLs yet. A compromised logged-on user or machine can access its DPAPI-protected identity; hardware-backed non-exportable keys are not implemented.
+The service and worker are visible, stoppable and removable; worker can persist a local opt-out. There is no hidden startup, Windows password storage or endpoint-protection bypass. File transfer and clipboard are disabled, not represented as production capabilities.
 
-## Remaining security work / blockers to production
-
-- Independent review, penetration testing, operational incident response and restore drill.
-- Windows interactive capture/input verification, locked-desktop race tests, keyboard layout/extended keys/IME, multi-user session switching and input cleanup under network failure. No UAC/logon control.
-- Signed MSI/EXE packaging, code-signing ownership and certificate lifecycle; unsigned installer generation and isolated silent install/uninstall passed on Windows CI; interactive lab installation remains unverified. Installer is per-user, visible in installed applications and Start menu; no hidden service or startup registration.
-- Automatic desktop activity indicator inside the remote user's session beyond the visible agent window; per-session local consent policy, device-specific ACLs and organization access policies.
-- Production reset-mail transport, MFA recovery codes, reset-token handling policy and forced change of admin-issued temporary passwords.
-- Global platform administration audit events, append-only audit enforcement beyond DB-role grants, retention/export and independent tamper evidence. No desktop recording.
-- Expired authorization rows without a connected viewer are denied but not eagerly marked ended; retention/cleanup jobs are needed.
-- Current data access bounds cap some list sizes; robust pagination, centralized metrics, distributed rate limiting and durable presence/relay routing remain.
-- WGC/Desktop Duplication, E2E media encryption, video codecs, network adaptive quality, load/performance measurements and complete input latency measurement.
-- Complete OpenAPI request/response schemas, policy/role customization, organization limits and entitlement enforcement.
-
-Never deploy with superuser/BYPASSRLS credentials. Run `app-role.sql` using migration credentials, set its password via a secret-aware tool, and use only the resulting runtime role. Application startup does not seed accounts or devices. Never commit `.env`, server private keys, MFA encryption key or agent identity files. Artifacts/keys and build outputs are excluded by Git.
-
-## Windows references
-
-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput — SendInput is constrained by UIPI and cannot elevate access.
-- https://learn.microsoft.com/en-us/windows/win32/services/interactive-services — Session 0 is not an interactive user desktop.
-- https://dotnet.microsoft.com/en-us/platform/support/policy — .NET 10 LTS selected; use a currently serviced patch.
-
-Report vulnerabilities privately to the repository owner; no public disclosure endpoint is configured.
+Remaining gates: full machine-enrollment/reboot/WTS/IPC integration, two-device trusted TLS validation, physical display and lock/UAC races, independent audit and penetration testing, MFA recovery generation concurrency review, complete global authentication/platform audit, stale-session cleanup after backend restart (existing rows can block a new grant until expiry), retention/export/tamper evidence, signing and key rotation policy, production recovery-provider configuration and restore/incident drills. The relay can read frames after TLS termination; no E2E media encryption claim is made. Use a NOSUPERUSER/NOBYPASSRLS runtime database role and external secrets. No production deployment has been performed.

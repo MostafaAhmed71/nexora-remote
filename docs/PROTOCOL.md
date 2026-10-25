@@ -1,21 +1,24 @@
-# Engine protocol v1
+# NEXORA Remote Engine protocol v2
 
-All non-loopback transport requires HTTPS/WSS. Certificates use platform validation; the agent never installs an accept-all TLS callback. Do not place tickets in proxy access logs. No custom cryptography is used.
+Protocol v1 is preserved in phase1/PROTOCOL_v1.md for historical evidence; its URL-ticket clients are intentionally rejected.
 
-- `POST /api/enrollments`: authenticated device-management grant; returns enrollment ID, organization ID, 256-bit token and `expiresIn:600`. Only its SHA-256 digest is stored. Enrollment redemption uses an atomic update in the device-creation transaction.
-- `POST /api/agent/enroll`: `{organizationId,token,name,publicKey,os,version}`. Only RSA >=3072 keys accepted. Returns device ID and server SPKI public PEM. Enrollment pins the grant key; rotation/re-enrollment policy remains future work.
-- `POST /api/agent/challenge`: `{deviceId}` → random nonce, thirty-second lifetime.
-- `POST /api/agent/prove`: `{organizationId,deviceId,nonce,signature}`. Signature is standard RSA-PKCS1-v1_5 SHA-256 over UTF-8 nonce, base64 encoded. Nonce consumed even on failed proof; ticket lifetime fifteen seconds.
-- `POST /api/sessions`: `{deviceId,mode:"view"|"control"}`. Current login/role/tenant/device trust required. At most one unexpired session per device while the device row is locked.
-- `POST /api/sessions/:id/ticket`: only the creating user, current view grant and matching organization. Single use.
-- `GET /api/socket?ticket=...`: consumes the hashed ticket. Agent ticket and viewer ticket have distinct server-held roles. No durable credential in a URL.
-- Server grant: JSON `{type:"grant",grant:"body.signature"}`. Body is base64url UTF-8 JSON `{sessionId,deviceId,organizationId,mode,expiresAt,protocol:1}`; signature is RSA-PKCS1-v1_5 SHA-256 over ASCII body, base64url. Agent rejects expiry beyond 301 seconds, invalid identity/mode or protocol.
-- Agent binary frame: 36 ASCII UUID bytes followed by JPEG; total <=2 MiB. Server strips UUID and forwards JPEG only to that session's viewer, after database validation. No arbitrary message routing destination supplied by viewer.
-- Input: `{kind:"move",x:0..1,y:0..1,seq}`, `{kind:"button",button:"left"|"right",down,seq}`, `{kind:"key",code:8..254,down,seq}`, `{kind:"release",seq}`. Server wraps as `{type:"input",sessionId,event}`. Both peers reject duplicate/decreasing sequences; only control grants execute input.
-- Server revoke: `{type:"revoke",sessionId}`. Agent releases held keys/buttons, clears grant. No frame/input accepted after DB expiry/revocation.
-- Agent `ping` every ten seconds → server `pong`; thirty seconds without ping closes presence.
-- Viewer `{type:"ping",sentAt:number}` → `{type:"pong",sentAt}` measures browser/server RTT, not agent latency.
+## Authorization
 
-Disconnected desktop sessions end. Agent reconnects automatically; user must request a fresh authorized desktop session. Transparent session resumption is intentionally not claimed.
+REST enrollment remains a 10-minute one-use token tied to organization plus RSA >=3072 public key. Agent signs a fresh 30-second nonce (RSA PKCS#1 v1.5/SHA-256), obtains a one-use 15-second socket ticket and connects with `Authorization: Bearer <ticket>`. Browser receives its own one-use ticket from an authenticated, role/device-ACL-authorized session and connects using subprotocols `nexora.v2`, `ticket.<ticket>`. The response negotiates `nexora.v2`; the ticket is cookie/session/Origin-bound. Never log credential headers. Query ticket credentials are rejected.
 
-REST reference is generated at `/api/docs` and `/api/docs/json`. Runtime request validation uses Zod; generated OpenAPI body/response schemas are incomplete and require expansion before SDK generation. API lists are capped for sessions/audit/users but cursor pagination is not yet available.
+Desktop grant format remains `base64url(JSON).base64url(RSA-SHA256 signature over ASCII body)`. Payload: sessionId, deviceId, organizationId, mode, expiresAt (Unix milliseconds), protocol:2. Lifetime is <=5 minutes and no longer than the authorizing login. Broker and worker verify identity, signature, mode, protocol and expiry. Each input is rechecked by the server against login, tenant membership, role, device trust, live session and device ACL. No new authorization is inferred from reconnect.
+
+## Messages
+
+- Agent sends text `ping`; server sends `pong`. Heartbeat is independent of frame processing.
+- Agent `{type:"health",interactive,frames,bytes,encodeMs,sessionId}`; server acknowledges `{type:"healthAck"}` and reports availability. Online presence and usable desktop are distinct. No worker/locked desktop is not advertised as a usable screen.
+- Viewer receives `{type:"ready",sessionId,mode,expiresAt}` only after authorized handlers are installed.
+- Agent binary: 36 ASCII session UUID bytes plus JPEG (<=2 MiB total); server validates current authorization and sends only JPEG to that viewer. Capture/decode are bounded, slow viewers drop complete old frames.
+- Viewer input uses positive monotonically increasing seq: release; move x/y in 0..1; button left/right + down; key VK 8..254 + down; wheel delta -1200..1200; text Unicode 1..1024 chars. Server wraps `{type:"input",sessionId,event}`. Active socket ownership is checked before and after awaited authorization, preventing a replaced socket's in-flight operation.
+- Viewer `{type:"quality",settings:{width:320..2560,quality:15..85,fps:1..15,monitor:0..31}}`; server validates authorization and bounds before forwarding with sessionId. Worker clamps display selection to actual monitor count. Multi-monitor transitions/DPI remain lab validation gates.
+- Viewer ping with numeric sentAt is echoed for browser/server RTT. This is not screen/input end-to-end latency.
+- Revoke carries sessionId. Held input is released; failed normal-desktop releases are retained for later retry. Service/worker disconnects do not grant ongoing control. Agent uses bounded exponential backoff+jitter, fresh proof and a fresh desktop session after transport loss.
+
+The local pipe is a separate, length-prefixed JSON channel capped at 3 MiB. Server-created random pipe uses FirstPipeInstance, SYSTEM + target-user SID allow rules, Network SID deny and no Everyone grant. Service verifies the exact launched worker PID; worker verifies the server PID against SCM's registered NexoraRemote service. Private device keys never cross the pipe. Worker receives only public identity and signed grants, validates those independently and runs as the console user, never as an interactive service in Session 0.
+
+Files and clipboard have no enabled message types. Unknown/invalid/oversized control operations fail closed. The relay terminates standard TLS in deployment; E2E media encryption is not claimed. Loopback HTTP is explicitly allowed only for test/development, while production origins must be HTTPS.
