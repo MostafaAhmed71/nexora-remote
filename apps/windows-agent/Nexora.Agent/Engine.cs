@@ -3,61 +3,37 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Drawing.Imaging;
+using System.Diagnostics;
 namespace Nexora.Remote;
 
-public sealed class Engine(Identity identity, Action<string> status) : IDisposable
+public sealed class Engine(Identity identity, Action<string> status, IRemoteDesktop? desktop = null) : IDisposable
 {
-    readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(15) };
-    readonly SemaphoreSlim sendLock = new(1, 1), stateLock = new(1, 1);
-    Grant? grant; long sequence; int delay = 200; long totalBytes;
-    static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
-    public async Task Run(CancellationToken ct)
-    {
-        ValidateServer(identity.Server); var attempt = 0;
-        while (!ct.IsCancellationRequested)
-        {
-            try { await Connect(ct); attempt = 0; } catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; } catch (Exception ex) { status("Disconnected: " + ex.Message); }
-            await ClearGrant(); await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, Math.Pow(2, Math.Min(attempt++, 5)))), ct);
-        }
-    }
-    public static void ValidateServer(string server) { var uri = new Uri(server); if (uri.Scheme != "https" && !(uri.Scheme == "http" && uri.IsLoopback)) throw new InvalidOperationException("HTTPS required except loopback development"); if (!string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)) throw new InvalidOperationException("Invalid server address"); }
+    readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(15) }; readonly SemaphoreSlim sendLock = new(1, 1), stateLock = new(1, 1); readonly IRemoteDesktop desktop = desktop ?? new LocalDesktop(); Grant? grant; CaptureOptions settings = new(); long lastPong; long totalBytes; int frames; double encodeMs; int adaptiveDelay = 200;
+    public static void ValidateServer(string server) { var u = new Uri(server); if (u.Scheme != "https" && !(u.Scheme == "http" && u.IsLoopback)) throw new InvalidOperationException("HTTPS required except loopback"); if (u.AbsolutePath != "/" || !string.IsNullOrEmpty(u.UserInfo) || !string.IsNullOrEmpty(u.Query) || !string.IsNullOrEmpty(u.Fragment)) throw new InvalidOperationException("Server must be an origin"); }
+    public async Task Run(CancellationToken ct) { ValidateServer(identity.Server); int attempt = 0; try { while (!ct.IsCancellationRequested) { var connected = Stopwatch.StartNew(); try { await Connect(ct); } catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; } catch (Exception ex) { status("Disconnected: " + ex.GetType().Name); AgentLog.Write("connection.error", ex.GetType().Name); } finally { await ClearGrant(); } if (connected.Elapsed > TimeSpan.FromSeconds(30)) attempt = 0; var delay = TimeSpan.FromMilliseconds(Math.Min(30000, 1000 * Math.Pow(2, Math.Min(attempt++, 5))) + Random.Shared.Next(250)); await Task.Delay(delay, ct); } } finally { await ClearGrant(); } }
     async Task<JsonElement> Post(string path, object body, CancellationToken ct) { using var response = await http.PostAsJsonAsync(identity.Server.TrimEnd('/') + path, body, ct); response.EnsureSuccessStatusCode(); return await response.Content.ReadFromJsonAsync<JsonElement>(ct); }
-    async Task Connect(CancellationToken ct)
-    {
-        var n = await Post("/api/agent/challenge", new { deviceId = identity.DeviceId }, ct); var nonce = n.GetProperty("nonce").GetString()!; using var rsa = RSA.Create(); rsa.ImportFromPem(identity.PrivateKey); var signature = Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(nonce), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)); var proof = await Post("/api/agent/prove", new { deviceId = identity.DeviceId, organizationId = identity.OrganizationId, nonce, signature }, ct);
-        using var ws = new ClientWebSocket(); var url = new UriBuilder(identity.Server) { Scheme = new Uri(identity.Server).Scheme == "https" ? "wss" : "ws", Path = "/api/socket", Query = "ticket=" + Uri.EscapeDataString(proof.GetProperty("ticket").GetString()!) }; await ws.ConnectAsync(url.Uri, ct); status("Connected — waiting for authorized session");
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct); var receive = Receive(ws, linked.Token); var capture = Capture(ws, linked.Token); var heartbeat = Heartbeat(ws, linked.Token); await Task.WhenAny(receive, capture, heartbeat); linked.Cancel(); try { await Task.WhenAll(receive, capture, heartbeat); } catch (OperationCanceledException) { }
-        await ClearGrant();
-    }
-    async Task Send(ClientWebSocket ws, byte[] bytes, WebSocketMessageType type, CancellationToken ct) { await sendLock.WaitAsync(ct); try { await ws.SendAsync(bytes.AsMemory(), type, true, ct); } finally { sendLock.Release(); } }
-    async Task Heartbeat(ClientWebSocket ws, CancellationToken ct) { while (!ct.IsCancellationRequested) { await Send(ws, Encoding.UTF8.GetBytes("ping"), WebSocketMessageType.Text, ct); await Task.Delay(10000, ct); } }
+    async Task Connect(CancellationToken ct) { var n = await Post("/api/agent/challenge", new { deviceId = identity.DeviceId }, ct); var nonce = n.GetProperty("nonce").GetString()!; using var rsa = RSA.Create(); rsa.ImportFromPem(identity.PrivateKey); var signature = Convert.ToBase64String(rsa.SignData(Encoding.UTF8.GetBytes(nonce), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)); var proof = await Post("/api/agent/prove", new { deviceId = identity.DeviceId, organizationId = identity.OrganizationId, nonce, signature }, ct); using var ws = new ClientWebSocket(); ws.Options.SetRequestHeader("Authorization", "Bearer " + proof.GetProperty("ticket").GetString()); var url = new UriBuilder(identity.Server) { Scheme = new Uri(identity.Server).Scheme == "https" ? "wss" : "ws", Path = "/api/socket" }; await ws.ConnectAsync(url.Uri, ct); lastPong = Environment.TickCount64; status("Connected; desktop " + (desktop.Available ? "available" : "unavailable")); using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct); var tasks = new[] { Receive(ws, linked.Token), Capture(ws, linked.Token), Heartbeat(ws, linked.Token) }; try { await Task.WhenAny(tasks); } finally { linked.Cancel(); ws.Abort(); try { await Task.WhenAll(tasks); } catch (OperationCanceledException) { } await ClearGrant(); } }
+    async Task Send(ClientWebSocket ws, byte[] bytes, WebSocketMessageType type, CancellationToken ct) { using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct); limit.CancelAfter(5000); await sendLock.WaitAsync(limit.Token); try { await ws.SendAsync(bytes.AsMemory(), type, true, limit.Token); } finally { sendLock.Release(); } }
+    async Task Heartbeat(ClientWebSocket ws, CancellationToken ct) { while (!ct.IsCancellationRequested) { if (Environment.TickCount64 - lastPong > 25000) throw new TimeoutException("Server heartbeat expired"); await Send(ws, Encoding.UTF8.GetBytes("ping"), WebSocketMessageType.Text, ct); await Send(ws, JsonSerializer.SerializeToUtf8Bytes(new { type = "health", interactive = desktop.Available, frames, bytes = totalBytes, encodeMs, sessionId = grant?.SessionId }), WebSocketMessageType.Text, ct); await Task.Delay(5000, ct); } }
     async Task Receive(ClientWebSocket ws, CancellationToken ct)
     {
-        byte[] buf = new byte[16384]; while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
+        var buf = new byte[16384]; while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
         {
-            using var ms = new MemoryStream(); WebSocketReceiveResult result; do { result = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct); if (result.MessageType == WebSocketMessageType.Close) return; ms.Write(buf, 0, result.Count); if (ms.Length > 65536) throw new InvalidDataException("Oversized control message"); } while (!result.EndOfMessage); var text = Encoding.UTF8.GetString(ms.ToArray()); if (text == "pong") continue; using var doc = JsonDocument.Parse(text); var root = doc.RootElement; await stateLock.WaitAsync(ct); try
+            using var ms = new MemoryStream(); WebSocketReceiveResult result; do { result = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct); if (result.MessageType == WebSocketMessageType.Close) return; if (result.MessageType != WebSocketMessageType.Text) throw new InvalidDataException("Expected control text"); ms.Write(buf, 0, result.Count); if (ms.Length > 65536) throw new InvalidDataException("Oversized control"); } while (!result.EndOfMessage); var text = Encoding.UTF8.GetString(ms.ToArray()); if (text == "pong") { lastPong = Environment.TickCount64; continue; }
+            using var doc = JsonDocument.Parse(text); var root = doc.RootElement; await stateLock.WaitAsync(ct); try
             {
                 switch (root.GetProperty("type").GetString())
                 {
-                    case "grant": NativeInput.ReleaseAll(); grant = GrantVerifier.Verify(root.GetProperty("grant").GetString()!, identity.ServerPublicKey, identity); sequence = 0; status("Authorized session: " + grant.Mode); break;
-                    case "revoke": if (grant?.SessionId == root.GetProperty("sessionId").GetString()) { NativeInput.ReleaseAll(); grant = null; status("Session revoked"); } break;
-                    case "input": if (grant == null || grant.Mode != "control" || grant.SessionId != root.GetProperty("sessionId").GetString() || grant.ExpiresAt <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) break; var e = root.GetProperty("event"); long seq = e.GetProperty("seq").GetInt64(); if (seq <= sequence) break; sequence = seq; NativeInput.Apply(e); break;
+                    case "grant": await desktop.Revoke(ct); var signed = root.GetProperty("grant").GetString()!; var checkedGrant = GrantVerifier.Verify(signed, identity.ServerPublicKey, identity); await desktop.Authorize(signed, identity, ct); grant = checkedGrant; status("Session authorized: " + grant.Mode); break;
+                    case "revoke": if (grant?.SessionId == root.GetProperty("sessionId").GetString()) { await desktop.Revoke(ct); grant = null; status("Session ended"); } break;
+                    case "quality": if (grant != null && grant.SessionId == root.GetProperty("sessionId").GetString()) { var q = root.GetProperty("settings"); settings = new CaptureOptions(q.GetProperty("width").GetInt32(), q.GetProperty("quality").GetInt32(), q.GetProperty("fps").GetInt32(), q.GetProperty("monitor").GetInt32()).Validate(); } break;
+                    case "input": if (grant?.Mode == "control" && grant.SessionId == root.GetProperty("sessionId").GetString() && grant.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) await desktop.Apply(root.GetProperty("event"), ct); break;
                 }
             }
             finally { stateLock.Release(); }
         }
     }
-    async Task Capture(ClientWebSocket ws, CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
-        {
-            await stateLock.WaitAsync(ct); Grant? g; try { if (grant?.ExpiresAt <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()) { NativeInput.ReleaseAll(); grant = null; } g = grant; } finally { stateLock.Release(); }
-            if (g != null && NativeInput.NormalDesktop()) { var watch = System.Diagnostics.Stopwatch.StartNew(); byte[] jpeg = CaptureJpeg(); if (jpeg.Length + 36 <= 2097152) { byte[] packet = new byte[36 + jpeg.Length]; Encoding.ASCII.GetBytes(g.SessionId).CopyTo(packet, 0); jpeg.CopyTo(packet, 36); await Send(ws, packet, WebSocketMessageType.Binary, ct); totalBytes += packet.Length; delay = watch.ElapsedMilliseconds > 400 ? Math.Min(1000, delay + 50) : Math.Max(200, delay - 10); status($"Session {g.Mode} • {1000 / delay} FPS target • {totalBytes / 1048576.0:F1} MB"); } }
-            await Task.Delay(delay, ct);
-        }
-    }
-    static byte[] CaptureJpeg() { var b = Screen.PrimaryScreen!.Bounds; using var bmp = new Bitmap(b.Width, b.Height, PixelFormat.Format24bppRgb); using (var graphics = Graphics.FromImage(bmp)) { graphics.CopyFromScreen(b.Location, Point.Empty, b.Size, CopyPixelOperation.SourceCopy); } var scale = Math.Min(1.0, 1280.0 / b.Width); using var small = new Bitmap(bmp, new Size(Math.Max(1, (int)(b.Width * scale)), Math.Max(1, (int)(b.Height * scale)))); using var ms = new MemoryStream(); var encoder = ImageCodecInfo.GetImageEncoders().First(x => x.MimeType == "image/jpeg"); using var parameters = new EncoderParameters(1); parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 55L); small.Save(ms, encoder, parameters); return ms.ToArray(); }
-    async Task ClearGrant() { await stateLock.WaitAsync(); try { NativeInput.ReleaseAll(); grant = null; } finally { stateLock.Release(); } }
-    public void Dispose() { http.Dispose(); sendLock.Dispose(); stateLock.Dispose(); }
+    async Task Capture(ClientWebSocket ws, CancellationToken ct) { while (!ct.IsCancellationRequested) { var watch = Stopwatch.StartNew(); await stateLock.WaitAsync(ct); try { if (grant?.ExpiresAt <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() || Environment.TickCount64 - lastPong > 10000) { await desktop.Revoke(ct); grant = null; } if (grant != null && desktop.Available) { var jpeg = await desktop.Capture(settings, ct); encodeMs = watch.Elapsed.TotalMilliseconds; if (jpeg is { Length: > 0 } && jpeg.Length + 36 <= 2097152) { var packet = new byte[36 + jpeg.Length]; Encoding.ASCII.GetBytes(grant.SessionId).CopyTo(packet, 0); jpeg.CopyTo(packet, 36); await Send(ws, packet, WebSocketMessageType.Binary, ct); totalBytes += packet.Length; frames++; } } } finally { stateLock.Release(); } int target = 1000 / settings.Fps; adaptiveDelay = watch.ElapsedMilliseconds > target ? Math.Min(1000, adaptiveDelay + 25) : Math.Max(target, adaptiveDelay - 10); await Task.Delay(Math.Max(1, adaptiveDelay - (int)watch.ElapsedMilliseconds), ct); } }
+    async Task ClearGrant() { await stateLock.WaitAsync(); try { grant = null; using var timeout = new CancellationTokenSource(2000); try { await desktop.Revoke(timeout.Token); } catch (Exception ex) { AgentLog.Write("revoke.error", ex.GetType().Name); } } finally { stateLock.Release(); } }
+    public void Dispose() { http.Dispose(); desktop.Dispose(); sendLock.Dispose(); stateLock.Dispose(); }
 }
