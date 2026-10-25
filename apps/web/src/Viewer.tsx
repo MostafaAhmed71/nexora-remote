@@ -353,7 +353,16 @@ export function Viewer({
         <canvas
           ref={canvas}
           className={fit ? "fit" : "actual"}
-          style={fit ? undefined : { width: `${zoom}%`, maxWidth: "none" }}
+          style={
+            fit
+              ? undefined
+              : {
+                  width: canvas.current
+                    ? `${(canvas.current.width * zoom) / 100}px`
+                    : undefined,
+                  maxWidth: "none",
+                }
+          }
           tabIndex={0}
           aria-label="سطح المكتب البعيد"
           onBlur={() => send({ kind: "release" })}

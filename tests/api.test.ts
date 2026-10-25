@@ -351,7 +351,14 @@ describe("device enrollment and authorization", () => {
     });
     agent.send(JSON.stringify({ type: "health", interactive: true }));
     await healthAck;
-    const auth = await call("/sessions", "POST", { deviceId, mode: "control" });
+    const concurrentStarts = await Promise.all([
+      call("/sessions", "POST", { deviceId, mode: "control" }),
+      call("/sessions", "POST", { deviceId, mode: "control" }),
+    ]);
+    expect(concurrentStarts.map((x) => x.statusCode).sort()).toEqual([
+      200, 409,
+    ]);
+    const auth = concurrentStarts.find((x) => x.statusCode === 200)!;
     expect(auth.statusCode).toBe(200);
     const sid = auth.json().id;
     const attempts = await Promise.all([
@@ -472,9 +479,49 @@ describe("device enrollment and authorization", () => {
       JSON.stringify({ kind: "key", code: 68, down: true, seq: 1 }),
     );
     expect(JSON.parse((await forwarded)[0].toString()).event.code).toBe(68);
+    const afterExpiry: any[] = [];
+    agent.on("message", (d) => {
+      try {
+        afterExpiry.push(JSON.parse(d.toString()));
+      } catch {}
+    });
+    await run(a, (tx) =>
+      tx.query(
+        "UPDATE remote_sessions SET expires_at=now()-interval '1 second' WHERE org_id=$1 AND id=$2",
+        [a, sid],
+      ),
+    );
     const closed = once(replacement, "close");
-    expect((await call("/sessions/" + sid, "DELETE")).statusCode).toBe(200);
+    replacement.send(
+      JSON.stringify({ kind: "text", text: "must not execute", seq: 2 }),
+    );
     await closed;
+    expect(afterExpiry.some((x) => x.type === "input")).toBe(false);
+    expect(
+      (await call("/sessions/" + sid + "/ticket", "POST", {})).statusCode,
+    ).toBe(403);
+    expect((await call("/sessions/" + sid, "DELETE")).statusCode).toBe(200);
+    const fresh = (
+      await call("/sessions", "POST", { deviceId, mode: "view" })
+    ).json();
+    const vt = (
+      await call("/sessions/" + fresh.id + "/ticket", "POST", {})
+    ).json().ticket;
+    const grantAgain = once(agent, "message");
+    const readOnly = await app.injectWS("/api/socket", {
+      headers: {
+        origin,
+        cookie: ownerCookie,
+        "sec-websocket-protocol": "nexora.v2, ticket." + vt,
+      },
+    });
+    await grantAgain;
+    const unavailable = once(readOnly, "close");
+    agent.send(JSON.stringify({ type: "health", interactive: false }));
+    await unavailable;
+    expect(
+      (await call("/sessions", "POST", { deviceId, mode: "view" })).statusCode,
+    ).toBe(409);
     agent.close();
   });
   it("blocks platform administration and protects cross-tenant device details", async () => {
@@ -653,6 +700,40 @@ describe("MFA and recovery", () => {
       });
       expect(response.statusCode).toBe(expected);
     }
+  });
+  it("atomically replaces recovery-code sets under concurrent regeneration", async () => {
+    const row = await db.query("SELECT mfa_secret FROM users WHERE id=$1", [
+      tech,
+    ]);
+    const { unseal } = await import("../apps/server/src/security.js");
+    const otp = new TOTP({
+      secret: Secret.fromBase32(
+        unseal((row.rows[0] as any).mfa_secret, Buffer.alloc(32, 9)),
+      ),
+    }).generate();
+    const responses = await Promise.all(
+      [1, 2].map((n) =>
+        app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/recovery-codes",
+          remoteAddress: `127.0.5.${n}`,
+          headers: { origin, cookie: techCookie },
+          payload: { password: "LongTestPassword!23", otp },
+        }),
+      ),
+    );
+    expect(responses.map((r) => r.statusCode)).toEqual([200, 200]);
+    const stored = await db.query(
+      "SELECT code_hash FROM mfa_recovery_codes WHERE user_id=$1",
+      [tech],
+    );
+    const hashes = new Set(stored.rows.map((x: any) => x.code_hash));
+    expect(hashes.size).toBe(10);
+    expect(
+      responses.some((r) =>
+        r.json().codes.every((c: string) => hashes.has(digest(c))),
+      ),
+    ).toBe(true);
   });
   it("reset token is single-use and invalidates login sessions", async () => {
     expect(

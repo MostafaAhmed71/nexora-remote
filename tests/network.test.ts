@@ -81,3 +81,53 @@ it("measures loopback transport under delay, bandwidth shaping, frame drops and 
     ),
   );
 }, 30000);
+
+it("discards interrupted WebSocket messages and measures a fresh reconnect", async () => {
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await once(server, "listening");
+  const completed: Buffer[] = [];
+  server.on("connection", (s) =>
+    s.on("message", (d) => {
+      completed.push(Buffer.from(d as Buffer));
+      s.send("complete");
+    }),
+  );
+  const url = "ws://127.0.0.1:" + (server.address() as any).port;
+  let socket = new WebSocket(url);
+  await once(socket, "open");
+  await new Promise<void>((resolve, reject) =>
+    socket.send(Buffer.alloc(8192), { binary: true, fin: false }, (e) =>
+      e ? reject(e) : resolve(),
+    ),
+  );
+  const disconnected = once(socket, "close");
+  socket.terminate();
+  await disconnected;
+  const start = performance.now();
+  socket = new WebSocket(url);
+  await once(socket, "open");
+  const ack = once(socket, "message");
+  socket.send(Buffer.from("fresh complete frame"));
+  await ack;
+  const reconnectMs = performance.now() - start;
+  expect(completed).toHaveLength(1);
+  expect(completed[0].toString()).toBe("fresh complete frame");
+  socket.close();
+  await once(socket, "close");
+  await new Promise<void>((r) => server.close(() => r()));
+  const { readFile } = await import("node:fs/promises");
+  const evidence = JSON.parse(
+    await readFile("artifacts/network-benchmark.json", "utf8"),
+  );
+  evidence.interruptedDelivery = {
+    partialMessagesDelivered: 0,
+    completeMessagesDelivered: 1,
+    reconnectMs,
+    scope:
+      "Fresh TCP/WebSocket loopback connection; not Agent reauthentication timing",
+  };
+  await writeFile(
+    "artifacts/network-benchmark.json",
+    JSON.stringify(evidence, null, 2),
+  );
+});

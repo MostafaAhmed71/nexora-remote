@@ -153,7 +153,7 @@ export async function createApp(o: Options) {
   async function audit(
     db: DB,
     org: string,
-    actor: string,
+    actor: string | null,
     event: string,
     target?: string,
   ) {
@@ -1095,7 +1095,28 @@ export async function createApp(o: Options) {
                   state.type === "health" &&
                   typeof state.interactive === "boolean"
                 ) {
+                  const wasInteractive = interactive.get(id);
                   interactive.set(id, state.interactive);
+                  if (wasInteractive === true && state.interactive === false) {
+                    for (const sid of sessionDevices.keys())
+                      if (sessionDevices.get(sid) === id) closeSession(sid);
+                    void o
+                      .run(org, async (db) => {
+                        const rows = await db.query(
+                          "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+                          [org, id],
+                        );
+                        for (const row of rows.rows)
+                          await audit(
+                            db,
+                            org,
+                            null,
+                            "session.desktop_unavailable",
+                            row.id,
+                          );
+                      })
+                      .catch(() => ws.close(1011));
+                  }
                   ws.send(JSON.stringify({ type: "healthAck" }));
                 }
                 if (state.type === "health")
@@ -1288,6 +1309,7 @@ export async function createApp(o: Options) {
           clearTimeout(expiry);
           if (viewers.get(id) === ws) {
             viewers.delete(id);
+            streamGates.delete(id);
             sessionDevices.delete(id);
             agents
               .get(s.device_id)
