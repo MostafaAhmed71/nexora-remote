@@ -1,6 +1,6 @@
 {
   "name": "nexora-remote",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Auditable multi-tenant Windows remote desktop engineering preview",
   "main": "index.js",
   "scripts": {

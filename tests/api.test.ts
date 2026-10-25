@@ -51,7 +51,8 @@ async function call(
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(
-    await readFile("packages/database/migrations/001_initial.sql", "utf8"),
+    (await readFile("packages/database/migrations/001_initial.sql", "utf8")) +
+      (await readFile("packages/database/migrations/002_security.sql", "utf8")),
   );
   await db.exec(
     "CREATE ROLE nexora_app; GRANT USAGE ON SCHEMA public TO nexora_app; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO nexora_app; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO nexora_app;",
@@ -297,7 +298,9 @@ describe("device enrollment and authorization", () => {
         signature,
       })
     ).json();
-    const agent = await app.injectWS("/api/socket?ticket=" + proof.ticket);
+    const agent = await app.injectWS("/api/socket", {
+      headers: { authorization: "Bearer " + proof.ticket },
+    });
     // Wait until asynchronous device validation has attached the handler.
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(
@@ -317,12 +320,35 @@ describe("device enrollment and authorization", () => {
     const ticket = (
       await call("/sessions/" + sid + "/ticket", "POST", {})
     ).json().ticket;
+    const wrongTicket = (
+      await call("/sessions/" + sid + "/ticket", "POST", {})
+    ).json().ticket;
+    const stolen = await app.injectWS("/api/socket", {
+      headers: {
+        origin,
+        cookie: viewerCookie,
+        "sec-websocket-protocol": "nexora.v2, ticket." + wrongTicket,
+      },
+    });
+    await once(stolen, "close");
     const grantPromise = once(agent, "message");
-    const viewerWs = await app.injectWS("/api/socket?ticket=" + ticket);
+    const viewerWs = await app.injectWS("/api/socket", {
+      headers: {
+        origin,
+        cookie: ownerCookie,
+        "sec-websocket-protocol": "nexora.v2, ticket." + ticket,
+      },
+    });
     const grantMessage = JSON.parse((await grantPromise)[0].toString());
     expect(grantMessage.type).toBe("grant");
     expect(grantMessage.grant).toContain(".");
-    const replay = await app.injectWS("/api/socket?ticket=" + ticket);
+    const replay = await app.injectWS("/api/socket", {
+      headers: {
+        origin,
+        cookie: ownerCookie,
+        "sec-websocket-protocol": "nexora.v2, ticket." + ticket,
+      },
+    });
     const replayClosed = once(replay, "close");
     await replayClosed;
     const frame = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
@@ -372,6 +398,60 @@ describe("device enrollment and authorization", () => {
       (await call("/devices/" + deviceId, "GET", undefined, b)).statusCode,
     ).toBe(404);
     expect((await call("/devices/" + deviceId)).statusCode).toBe(200);
+  });
+  it("enforces device ACLs independently from organization RBAC and validates ACL tenants", async () => {
+    expect(
+      (
+        await call(
+          "/sessions",
+          "POST",
+          { deviceId, mode: "view" },
+          a,
+          viewerCookie,
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await call("/devices/" + deviceId + "/acl", "PUT", {
+          enforced: true,
+          entries: [{ userId: randomUUID(), permission: "view" }],
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await call("/devices/" + deviceId + "/acl", "PUT", {
+          enforced: true,
+          entries: [{ userId: tech, permission: "view" }],
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          "/sessions",
+          "POST",
+          { deviceId, mode: "control" },
+          a,
+          techCookie,
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (await call("/devices/" + deviceId + "/acl", "GET", undefined, b))
+        .statusCode,
+    ).toBe(404);
+    const acl = (await call("/devices/" + deviceId + "/acl")).json();
+    expect(acl.enforced).toBe(true);
+    expect(acl.entries[0].permission).toBe("view");
+  });
+  it("rejects URL credentials and anonymous sockets", async () => {
+    const { once } = await import("node:events");
+    for (const path of ["/api/socket?ticket=not-a-ticket", "/api/socket"]) {
+      const socket = await app.injectWS(path);
+      await once(socket, "close");
+    }
   });
   it("revokes device trust and rejects fresh proof", async () => {
     expect((await call("/devices/" + deviceId, "DELETE")).statusCode).toBe(200);
@@ -432,6 +512,59 @@ describe("MFA and recovery", () => {
         })
       ).statusCode,
     ).toBe(200);
+  });
+  it("issues only hashed, one-use MFA recovery codes after password plus TOTP", async () => {
+    const row = await db.query("SELECT mfa_secret FROM users WHERE id=$1", [
+      tech,
+    ]);
+    const { unseal } = await import("../apps/server/src/security.js");
+    const otp = new TOTP({
+      secret: Secret.fromBase32(
+        unseal((row.rows[0] as any).mfa_secret as string, Buffer.alloc(32, 9)),
+      ),
+    }).generate();
+    expect(
+      (
+        await call(
+          "/auth/mfa/recovery-codes",
+          "POST",
+          { password: "wrong", otp },
+          a,
+          techCookie,
+        )
+      ).statusCode,
+    ).toBe(403);
+    const r = await call(
+      "/auth/mfa/recovery-codes",
+      "POST",
+      { password: "LongTestPassword!23", otp },
+      a,
+      techCookie,
+    );
+    expect(r.statusCode).toBe(200);
+    const codes = r.json().codes;
+    expect(codes).toHaveLength(10);
+    const stored = await db.query(
+      "SELECT code_hash FROM mfa_recovery_codes WHERE user_id=$1",
+      [tech],
+    );
+    expect(stored.rows.map((x: any) => x.code_hash)).toContain(
+      digest(codes[0]),
+    );
+    expect(stored.rows.map((x: any) => x.code_hash)).not.toContain(codes[0]);
+    for (const [index, expected] of [200, 401].entries()) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        remoteAddress: "127.0.2.1",
+        payload: {
+          email: "tech@example.test",
+          password: "LongTestPassword!23",
+          recoveryCode: codes[0],
+        },
+      });
+      expect(response.statusCode).toBe(expected);
+    }
   });
   it("reset token is single-use and invalidates login sessions", async () => {
     expect(

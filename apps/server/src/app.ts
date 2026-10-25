@@ -14,6 +14,7 @@ import type { DB } from "../../../packages/database/index.js";
 import { allowed } from "../../../packages/shared/index.js";
 import {
   inputSchema,
+  qualitySchema,
   MAX_FRAME_BYTES,
 } from "../../../packages/protocol/index.js";
 import {
@@ -42,7 +43,20 @@ const one = async (db: DB, q: string, p: any[] = []) =>
   (await db.query(q, p)).rows[0];
 export async function createApp(o: Options) {
   if (o.mfaKey.length !== 32) throw new Error("MFA key must be 32 bytes");
-  const app = Fastify({ logger: false, bodyLimit: 64 * 1024 });
+  if (o.production && !o.origin.startsWith("https://"))
+    throw new Error("Production origin requires HTTPS");
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL ?? "warn",
+      redact: [
+        "req.headers.authorization",
+        "req.headers.cookie",
+        "req.headers.sec-websocket-protocol",
+        "res.headers.set-cookie",
+      ],
+    },
+    bodyLimit: 64 * 1024,
+  });
   await app.register(cookie);
   await app.register(helmet);
   await app.register(rateLimit, {
@@ -50,18 +64,25 @@ export async function createApp(o: Options) {
     timeWindow: "1 minute",
     keyGenerator: (req) => req.ip ?? "unknown",
   });
-  await app.register(websocket, { options: { maxPayload: MAX_FRAME_BYTES } });
+  await app.register(websocket, {
+    options: {
+      maxPayload: MAX_FRAME_BYTES,
+      handleProtocols: (protocols) =>
+        protocols.has("nexora.v2") ? "nexora.v2" : false,
+    },
+  });
   await app.register(swagger, {
     openapi: { info: { title: "NEXORA Remote API", version: "0.1.0" } },
   });
   await app.register(swaggerUI, { routePrefix: "/api/docs" });
   const agents = new Map<string, WebSocket>();
+  const interactive = new Map<string, boolean>();
   const viewers = new Map<string, WebSocket>();
   const sessionDevices = new Map<string, string>();
   const challenges = new Map<string, { device: string; expires: number }>();
   const tickets = new Map<
     string,
-    { side: "agent" | "viewer"; id: string; expires: number }
+    { side: "agent" | "viewer"; id: string; expires: number; authHash?: string }
   >();
   const sweep = setInterval(() => {
     const now = Date.now();
@@ -149,7 +170,7 @@ export async function createApp(o: Options) {
         for (const row of ended.rows) closeSession(row.id);
       });
   }
-  app.get("/api/health", async () => ({ status: "ok", protocol: 1 }));
+  app.get("/api/health", async () => ({ status: "ok", protocol: 2 }));
   app.post(
     "/api/auth/login",
     { config: { rateLimit: { max: 8, timeWindow: "1 minute" } } },
@@ -159,6 +180,7 @@ export async function createApp(o: Options) {
           email: z.email(),
           password: z.string().max(256),
           otp: z.string().optional(),
+          recoveryCode: z.string().max(128).optional(),
         })
         .parse(req.body);
       const u = await one(o.db, "SELECT * FROM users WHERE email=$1", [
@@ -167,17 +189,25 @@ export async function createApp(o: Options) {
       if (!u || !(await argon2.verify(u.password_hash, b.password)))
         throw fail(401, "Invalid credentials");
       if (u.mfa_secret) {
-        const t = new TOTP({
-          secret: Secret.fromBase32(unseal(u.mfa_secret, o.mfaKey)),
-        });
-        if (!b.otp || t.validate({ token: b.otp, window: 0 }) === null)
-          throw fail(401, "MFA code required or invalid");
-        const counter = Math.floor(Date.now() / 30000);
-        const used = await o.db.query(
-          "UPDATE users SET mfa_counter=$1 WHERE id=$2 AND (mfa_counter IS NULL OR mfa_counter<$1) RETURNING id",
-          [counter, u.id],
-        );
-        if (!used.rows.length) throw fail(401, "MFA code already used");
+        if (b.recoveryCode) {
+          const consumed = await o.db.query(
+            "UPDATE mfa_recovery_codes SET used_at=now() WHERE user_id=$1 AND code_hash=$2 AND used_at IS NULL RETURNING code_hash",
+            [u.id, digest(b.recoveryCode)],
+          );
+          if (!consumed.rows.length) throw fail(401, "Invalid recovery code");
+        } else {
+          const t = new TOTP({
+            secret: Secret.fromBase32(unseal(u.mfa_secret, o.mfaKey)),
+          });
+          if (!b.otp || t.validate({ token: b.otp, window: 0 }) === null)
+            throw fail(401, "MFA code required or invalid");
+          const counter = Math.floor(Date.now() / 30000);
+          const used = await o.db.query(
+            "UPDATE users SET mfa_counter=$1 WHERE id=$2 AND (mfa_counter IS NULL OR mfa_counter<$1) RETURNING id",
+            [counter, u.id],
+          );
+          if (!used.rows.length) throw fail(401, "MFA code already used");
+        }
       }
       const s = token();
       await o.db.query(
@@ -303,6 +333,129 @@ export async function createApp(o: Options) {
       return { ok: true };
     },
   );
+  app.post(
+    "/api/auth/mfa/recovery-codes",
+    { config: { rateLimit: { max: 3, timeWindow: "1 minute" } } },
+    async (req) => {
+      const u = await user(req);
+      const b = z
+        .object({ password: z.string().max(256), otp: z.string().length(6) })
+        .parse(req.body);
+      const row = await one(
+        o.db,
+        "SELECT password_hash,mfa_secret FROM users WHERE id=$1",
+        [u.id],
+      );
+      if (
+        !row.mfa_secret ||
+        !(await argon2.verify(row.password_hash, b.password)) ||
+        new TOTP({
+          secret: Secret.fromBase32(unseal(row.mfa_secret, o.mfaKey)),
+        }).validate({ token: b.otp, window: 0 }) === null
+      )
+        throw fail(403, "Password and MFA required");
+      const codes = Array.from({ length: 10 }, () => token().slice(0, 24));
+      await o.db.query("DELETE FROM mfa_recovery_codes WHERE user_id=$1", [
+        u.id,
+      ]);
+      for (const code of codes)
+        await o.db.query(
+          "INSERT INTO mfa_recovery_codes(user_id,code_hash) VALUES($1,$2)",
+          [u.id, digest(code)],
+        );
+      return { codes };
+    },
+  );
+  async function deviceAllowed(
+    db: DB,
+    org: string,
+    device: string,
+    userId: string,
+    permission: string,
+  ) {
+    return !!(await one(
+      db,
+      "SELECT d.id FROM devices d JOIN memberships m ON m.org_id=d.org_id AND m.user_id=$3 WHERE d.org_id=$1 AND d.id=$2 AND d.revoked_at IS NULL AND (NOT d.acl_enforced OR m.role IN ('owner','admin') OR EXISTS(SELECT 1 FROM device_acl a WHERE a.org_id=d.org_id AND a.device_id=d.id AND a.user_id=$3 AND a.permission=$4))",
+      [org, device, userId, permission],
+    ));
+  }
+  app.put("/api/devices/:id/acl", async (req) => {
+    const { org, u } = await scope(req, "devices");
+    const id = uuid.parse((req.params as any).id);
+    const b = z
+      .object({
+        enforced: z.boolean(),
+        entries: z
+          .array(
+            z.object({
+              userId: uuid,
+              permission: z.enum(["view", "control", "clipboard", "files"]),
+            }),
+          )
+          .max(200),
+      })
+      .parse(req.body);
+    return o.run(org, async (db) => {
+      if (
+        !(await one(
+          db,
+          "SELECT id FROM devices WHERE org_id=$1 AND id=$2 FOR UPDATE",
+          [org, id],
+        ))
+      )
+        throw fail(404, "Device not found");
+      for (const entry of b.entries)
+        if (
+          !(await one(
+            db,
+            "SELECT 1 FROM memberships WHERE org_id=$1 AND user_id=$2",
+            [org, entry.userId],
+          ))
+        )
+          throw fail(400, "ACL user must belong to organization");
+      await db.query(
+        "DELETE FROM device_acl WHERE org_id=$1 AND device_id=$2",
+        [org, id],
+      );
+      for (const entry of b.entries)
+        await db.query(
+          "INSERT INTO device_acl VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING",
+          [org, id, entry.userId, entry.permission],
+        );
+      await db.query(
+        "UPDATE devices SET acl_enforced=$1 WHERE org_id=$2 AND id=$3",
+        [b.enforced, org, id],
+      );
+      const ended = await db.query(
+        "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+        [org, id],
+      );
+      ended.rows.forEach((row) => closeSession(row.id));
+      await audit(db, org, u.id, "device.acl_changed", id);
+      return { ok: true };
+    });
+  });
+  app.get("/api/devices/:id/acl", async (req) => {
+    const { org } = await scope(req, "devices");
+    const id = uuid.parse((req.params as any).id);
+    return o.run(org, async (db) => {
+      const d = await one(
+        db,
+        "SELECT acl_enforced FROM devices WHERE org_id=$1 AND id=$2",
+        [org, id],
+      );
+      if (!d) throw fail(404, "Device not found");
+      return {
+        enforced: d.acl_enforced,
+        entries: (
+          await db.query(
+            "SELECT user_id,permission FROM device_acl WHERE org_id=$1 AND device_id=$2",
+            [org, id],
+          )
+        ).rows,
+      };
+    });
+  });
   app.get("/api/organizations", async (req) => {
     const u = await user(req);
     /* RLS: enumerate organizations through per-org membership transactions. */ const all =
@@ -379,7 +532,7 @@ export async function createApp(o: Options) {
     const u = await user(req);
     if (!u.platform_admin) throw fail(403, "Platform administrator required");
     return {
-      protocol: 1,
+      protocol: 2,
       sessionMinutes: 5,
       frameTransport: "JPEG over WebSocket relay",
       passwordResetDelivery: !!o.deliverReset,
@@ -587,7 +740,7 @@ export async function createApp(o: Options) {
         if (!e) throw fail(403, "Invalid enrollment");
         const id = randomUUID();
         await db.query(
-          "INSERT INTO devices(id,org_id,name,public_key,os,agent_version,capabilities) VALUES($1,$2,$3,$4,$5,$6,$7)",
+          "INSERT INTO devices(id,org_id,name,public_key,os,agent_version,capabilities,acl_enforced) VALUES($1,$2,$3,$4,$5,$6,$7,true)",
           [
             id,
             b.organizationId,
@@ -620,6 +773,7 @@ export async function createApp(o: Options) {
       ended.rows.forEach((s) => closeSession(s.id));
       agents.get(id)?.close(1008, "Trust revoked");
       agents.delete(id);
+      interactive.delete(id);
       await audit(db, org, u.id, "device.revoked", id);
       return { ok: true };
     });
@@ -673,7 +827,11 @@ export async function createApp(o: Options) {
         [org, b.deviceId],
       );
       if (!d) throw fail(404, "Device not found");
+      if (!(await deviceAllowed(db, org, d.id, u.id, b.mode)))
+        throw fail(403, "Device ACL denied");
       if (!agents.has(d.id)) throw fail(409, "Device is offline");
+      if (interactive.get(d.id) === false)
+        throw fail(409, "No interactive desktop available");
       if (
         await one(
           db,
@@ -719,9 +877,17 @@ export async function createApp(o: Options) {
     );
   });
   app.delete("/api/sessions/:id", async (req) => {
-    const { org, u } = await scope(req, "terminate");
+    const { org, u, role } = await scope(req);
     const id = uuid.parse((req.params as any).id);
     return o.run(org, async (db) => {
+      const own = await one(
+        db,
+        "SELECT user_id FROM remote_sessions WHERE org_id=$1 AND id=$2",
+        [org, id],
+      );
+      if (!own) throw fail(404, "Session not found");
+      if (own.user_id !== u.id && !allowed(role, "terminate"))
+        throw fail(403, "Permission denied");
       const s = await one(
         db,
         "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2 RETURNING id",
@@ -749,6 +915,7 @@ export async function createApp(o: Options) {
       side: "viewer",
       id: org + ":" + id,
       expires: Date.now() + 15000,
+      authHash: digest(req.cookies.nr_session!),
     });
     return { ticket: t };
   });
@@ -785,7 +952,7 @@ export async function createApp(o: Options) {
     return o.run(org, async (db) =>
       one(
         db,
-        "SELECT s.* FROM remote_sessions s JOIN devices d ON d.id=s.device_id AND d.org_id=s.org_id JOIN auth_sessions login ON login.id_hash=s.auth_session_hash AND login.expires_at>now() JOIN memberships m ON m.org_id=s.org_id AND m.user_id=s.user_id WHERE s.org_id=$1 AND s.id=$2 AND s.state<>'ended' AND s.expires_at>now() AND d.revoked_at IS NULL AND EXISTS(SELECT 1 FROM role_permissions rp WHERE rp.role=m.role AND rp.permission=s.mode)",
+        "SELECT s.* FROM remote_sessions s JOIN devices d ON d.id=s.device_id AND d.org_id=s.org_id JOIN auth_sessions login ON login.id_hash=s.auth_session_hash AND login.expires_at>now() JOIN memberships m ON m.org_id=s.org_id AND m.user_id=s.user_id WHERE s.org_id=$1 AND s.id=$2 AND s.state<>'ended' AND s.expires_at>now() AND d.revoked_at IS NULL AND (NOT d.acl_enforced OR m.role IN ('owner','admin') OR EXISTS(SELECT 1 FROM device_acl acl WHERE acl.org_id=s.org_id AND acl.device_id=s.device_id AND acl.user_id=s.user_id AND acl.permission=s.mode)) AND EXISTS(SELECT 1 FROM role_permissions rp WHERE rp.role=m.role AND rp.permission=s.mode)",
         [org, id],
       ),
     );
@@ -796,14 +963,29 @@ export async function createApp(o: Options) {
         ws.close(1008);
         return;
       }
-      const t = z.object({ ticket: z.string() }).safeParse(req.query);
-      if (!t.success) {
+      // Tickets never belong in URLs/access logs. Agent uses Authorization; browser uses a subprotocol.
+      if ((req.query as any)?.ticket) {
+        ws.close(1008, "URL credentials rejected");
+        return;
+      }
+      const protocols = String(req.headers["sec-websocket-protocol"] ?? "")
+        .split(",")
+        .map((s) => s.trim());
+      const raw = req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.slice(7)
+        : protocols.find((p) => p.startsWith("ticket."))?.slice(7);
+      const ticket = raw ? tickets.get(digest(raw)) : undefined;
+      if (raw) tickets.delete(digest(raw));
+      if (!ticket || ticket.expires < Date.now()) {
         ws.close(1008);
         return;
       }
-      const ticket = tickets.get(digest(t.data.ticket));
-      tickets.delete(digest(t.data.ticket));
-      if (!ticket || ticket.expires < Date.now()) {
+      if (
+        ticket.side === "viewer" &&
+        (req.headers.origin !== o.origin ||
+          !req.cookies.nr_session ||
+          digest(req.cookies.nr_session) !== ticket.authHash)
+      ) {
         ws.close(1008);
         return;
       }
@@ -820,7 +1002,16 @@ export async function createApp(o: Options) {
           ws.close(1008);
           return;
         }
-        agents.get(id)?.close(1000, "Reconnected");
+        if (agents.has(id)) {
+          const ended = await o.run(org, (db) =>
+            db.query(
+              "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+              [org, id],
+            ),
+          );
+          ended.rows.forEach((row) => closeSession(row.id));
+          agents.get(id)?.terminate();
+        }
         agents.set(id, ws);
         await o.run(org, (db) =>
           db.query(
@@ -836,28 +1027,53 @@ export async function createApp(o: Options) {
         watchdog.unref();
         let busy = false;
         ws.on("message", (data, isBinary) => {
-          if (busy) return;
-          busy = true;
-          void (async () => {
-            if (!isBinary) {
-              if (data.toString() === "ping") {
-                lastPing = Date.now();
-                await o.run(org, (db) =>
+          if (agents.get(id) !== ws || ws.readyState !== 1) return;
+          if (!isBinary) {
+            if (data.toString() === "ping") {
+              lastPing = Date.now();
+              ws.send("pong");
+              void o
+                .run(org, (db) =>
                   db.query(
                     "UPDATE devices SET last_seen=now() WHERE org_id=$1 AND id=$2 AND revoked_at IS NULL",
                     [org, id],
                   ),
-                );
-                ws.send("pong");
+                )
+                .catch(() => ws.close(1011));
+            } else {
+              try {
+                const state = JSON.parse(data.toString());
+                if (
+                  state.type === "health" &&
+                  typeof state.interactive === "boolean"
+                ) {
+                  interactive.set(id, state.interactive);
+                }
+                if (state.type === "health")
+                  for (const sid of sessionDevices.keys())
+                    if (sessionDevices.get(sid) === id)
+                      viewers.get(sid)?.send(JSON.stringify(state));
+              } catch {
+                ws.close(1008);
               }
-              return;
             }
+            return;
+          }
+          if (busy) return;
+          busy = true;
+          void (async () => {
             const bytes = Buffer.from(data as Buffer);
             if (bytes.length < 38 || bytes.length > MAX_FRAME_BYTES) return;
             const sid = bytes.subarray(0, 36).toString();
             if (!uuid.safeParse(sid).success) return;
             const s = await validSession(org, sid);
-            if (!s || s.device_id !== id) return;
+            if (
+              !s ||
+              s.device_id !== id ||
+              agents.get(id) !== ws ||
+              ws.readyState !== 1
+            )
+              return;
             const viewer = viewers.get(sid);
             if (
               viewer?.readyState === 1 &&
@@ -874,13 +1090,16 @@ export async function createApp(o: Options) {
           clearInterval(watchdog);
           if (agents.get(id) === ws) {
             agents.delete(id);
-            void o.run(org, async (db) => {
-              const rows = await db.query(
-                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
-                [org, id],
-              );
-              rows.rows.forEach((s) => closeSession(s.id));
-            });
+            interactive.delete(id);
+            void o
+              .run(org, async (db) => {
+                const rows = await db.query(
+                  "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND device_id=$2 AND state<>'ended' RETURNING id",
+                  [org, id],
+                );
+                rows.rows.forEach((s) => closeSession(s.id));
+              })
+              .catch(() => app.log.error("Disconnect cleanup failed"));
           }
         });
       } else {
@@ -905,7 +1124,7 @@ export async function createApp(o: Options) {
             organizationId: org,
             mode: s.mode,
             expiresAt: new Date(s.expires_at).getTime(),
-            protocol: 1,
+            protocol: 2,
           },
           o.signingKey,
         );
@@ -921,7 +1140,7 @@ export async function createApp(o: Options) {
           pending++;
           queue = queue
             .then(async () => {
-              if (ws.readyState !== 1) return;
+              if (ws.readyState !== 1 || viewers.get(id) !== ws) return;
               const message = JSON.parse(data.toString());
               if (
                 message.type === "ping" &&
@@ -932,6 +1151,23 @@ export async function createApp(o: Options) {
                 );
                 return;
               }
+              if (message.type === "quality") {
+                const current = await validSession(org, id);
+                const q = qualitySchema.safeParse(message.settings);
+                if (!current || !q.success) {
+                  ws.close(1008);
+                  return;
+                }
+                if (viewers.get(id) === ws)
+                  agents.get(s.device_id)?.send(
+                    JSON.stringify({
+                      type: "quality",
+                      sessionId: id,
+                      settings: q.data,
+                    }),
+                  );
+                return;
+              }
               const e = inputSchema.safeParse(message);
               if (!e.success || e.data.seq <= seq) return;
               const current = await validSession(org, id);
@@ -939,6 +1175,7 @@ export async function createApp(o: Options) {
                 ws.close(1008);
                 return;
               }
+              if (viewers.get(id) !== ws || ws.readyState !== 1) return;
               seq = e.data.seq;
               agents.get(s.device_id)?.send(
                 JSON.stringify({
@@ -955,13 +1192,16 @@ export async function createApp(o: Options) {
         });
         const expiry = setTimeout(
           () => {
+            if (viewers.get(id) !== ws) return;
             closeSession(id);
-            void o.run(org, (db) =>
-              db.query(
-                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
-                [org, id],
-              ),
-            );
+            void o
+              .run(org, (db) =>
+                db.query(
+                  "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
+                  [org, id],
+                ),
+              )
+              .catch(() => app.log.error("Session cleanup failed"));
           },
           Math.max(0, new Date(s.expires_at).getTime() - Date.now()),
         );
@@ -973,14 +1213,24 @@ export async function createApp(o: Options) {
             agents
               .get(s.device_id)
               ?.send(JSON.stringify({ type: "revoke", sessionId: id }));
-            void o.run(org, (db) =>
-              db.query(
-                "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
-                [org, id],
-              ),
-            );
+            void o
+              .run(org, (db) =>
+                db.query(
+                  "UPDATE remote_sessions SET state='ended',ended_at=now() WHERE org_id=$1 AND id=$2",
+                  [org, id],
+                ),
+              )
+              .catch(() => app.log.error("Session cleanup failed"));
           }
         });
+        ws.send(
+          JSON.stringify({
+            type: "ready",
+            sessionId: id,
+            mode: s.mode,
+            expiresAt: new Date(s.expires_at).getTime(),
+          }),
+        );
       }
     })().catch(() => ws.close(1008));
   });

@@ -16,7 +16,7 @@ export const grants = {
 export type Role = keyof typeof grants;
 export function allowed(role: string, permission: string) {
   return (
-    role in grants &&
+    Object.hasOwn(grants, role) &&
     (grants[role as Role] as readonly string[]).includes(permission)
   );
 }

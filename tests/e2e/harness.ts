@@ -9,7 +9,8 @@ if (process.env.NODE_ENV === "production")
   throw new Error("Test harness forbidden in production");
 const db = new PGlite();
 await db.exec(
-  await readFile("packages/database/migrations/001_initial.sql", "utf8"),
+  (await readFile("packages/database/migrations/001_initial.sql", "utf8")) +
+    (await readFile("packages/database/migrations/002_security.sql", "utf8")),
 );
 const org = randomUUID(),
   user = randomUUID();

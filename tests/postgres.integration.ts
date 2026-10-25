@@ -10,7 +10,8 @@ await c.connect();
 try {
   await c.query("BEGIN");
   await c.query(
-    await readFile("packages/database/migrations/001_initial.sql", "utf8"),
+    (await readFile("packages/database/migrations/001_initial.sql", "utf8")) +
+      (await readFile("packages/database/migrations/002_security.sql", "utf8")),
   );
   const a = randomUUID(),
     b = randomUUID(),
