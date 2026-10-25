@@ -29,11 +29,26 @@ const key = generateKeyPairSync("rsa", {
 const adapter = (client: any): DB => ({
   query: async (sql, params) => client.query(sql, params),
 });
-const run = async <T>(org: string, fn: (d: DB) => Promise<T>) =>
-  db.transaction(async (tx) => {
+let suspendedRead:
+  { id: string; entered: () => void; wait: Promise<void> } | undefined;
+const run = async <T>(org: string, fn: (d: DB) => Promise<T>) => {
+  const value = await db.transaction(async (tx) => {
     await tx.query("SELECT set_config('app.org_id',$1,true)", [org]);
     return fn(adapter(tx));
   });
+  const gate = suspendedRead;
+  if (
+    gate &&
+    (value as any)?.id === gate.id &&
+    (value as any)?.auth_session_hash
+  ) {
+    suspendedRead = undefined;
+    gate.entered();
+    await gate.wait;
+  }
+  return value;
+};
+
 async function call(
   path: string,
   method: any = "GET",
@@ -283,7 +298,7 @@ describe("device enrollment and authorization", () => {
         .json()
         .some((r: any) => r.event === "device.enrolled"),
     ).toBe(true));
-  it("relays frames and authorized input, rejects ticket replay, terminates session", async () => {
+  it("relays authorized frames/input, rejects ticket replay and stale in-flight input after viewer replacement", async () => {
     const { once } = await import("node:events");
     const n = (await call("/agent/challenge", "POST", { deviceId })).json()
       .nonce;
@@ -314,9 +329,18 @@ describe("device enrollment and authorization", () => {
         resolve();
       });
     });
+    await db.query(
+      "UPDATE auth_sessions SET expires_at=now()+interval '2 minutes' WHERE id_hash=$1",
+      [digest(ownerCookie.split("=")[1])],
+    );
     const auth = await call("/sessions", "POST", { deviceId, mode: "control" });
     expect(auth.statusCode).toBe(200);
     const sid = auth.json().id;
+    expect(auth.json().expiresAt).toBeLessThanOrEqual(Date.now() + 121000);
+    await db.query(
+      "UPDATE auth_sessions SET expires_at=now()+interval '8 hours' WHERE id_hash=$1",
+      [digest(ownerCookie.split("=")[1])],
+    );
     const ticket = (
       await call("/sessions/" + sid + "/ticket", "POST", {})
     ).json().ticket;
@@ -384,7 +408,34 @@ describe("device enrollment and authorization", () => {
     );
     viewerWs.send(JSON.stringify({ kind: "release", seq: 3 }));
     expect((await releases).map((e) => e.kind)).toEqual(["key", "release"]);
-    const closed = once(viewerWs, "close");
+    // Simulate an authorization read completing just before viewer ownership changes.
+    const replacementTicket = (
+      await call("/sessions/" + sid + "/ticket", "POST", {})
+    ).json().ticket;
+    let enter!: () => void, release!: () => void;
+    const entered = new Promise<void>((r) => (enter = r));
+    const blocked = new Promise<void>((r) => (release = r));
+    suspendedRead = { id: sid, entered: enter, wait: blocked };
+    viewerWs.send(
+      JSON.stringify({ kind: "key", code: 67, down: true, seq: 4 }),
+    );
+    await entered;
+    const newGrant = once(agent, "message");
+    const replacement = await app.injectWS("/api/socket", {
+      headers: {
+        origin,
+        cookie: ownerCookie,
+        "sec-websocket-protocol": "nexora.v2, ticket." + replacementTicket,
+      },
+    });
+    expect(JSON.parse((await newGrant)[0].toString()).type).toBe("grant");
+    const forwarded = once(agent, "message");
+    release();
+    replacement.send(
+      JSON.stringify({ kind: "key", code: 68, down: true, seq: 1 }),
+    );
+    expect(JSON.parse((await forwarded)[0].toString()).event.code).toBe(68);
+    const closed = once(replacement, "close");
     expect((await call("/sessions/" + sid, "DELETE")).statusCode).toBe(200);
     await closed;
     agent.close();

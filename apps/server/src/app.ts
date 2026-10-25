@@ -128,7 +128,7 @@ export async function createApp(o: Options) {
     if (!raw) throw fail(401, "Login required");
     const u = await one(
       o.db,
-      "SELECT u.id,u.email,u.mfa_secret,u.platform_admin FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id_hash=$1 AND s.expires_at>now()",
+      "SELECT u.id,u.email,u.mfa_secret,u.platform_admin,s.expires_at AS auth_expires_at FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id_hash=$1 AND s.expires_at>now()",
       [digest(raw)],
     );
     if (!u) throw fail(401, "Session expired");
@@ -841,7 +841,10 @@ export async function createApp(o: Options) {
       )
         throw fail(409, "Device already in session");
       const id = randomUUID();
-      const expires = Date.now() + 5 * 60 * 1000;
+      const expires = Math.min(
+        Date.now() + 5 * 60 * 1000,
+        new Date(u.auth_expires_at).getTime(),
+      );
       await db.query(
         "INSERT INTO remote_sessions(id,org_id,device_id,user_id,mode,state,expires_at,auth_session_hash) VALUES($1,$2,$3,$4,$5,'authorized',$6,$7)",
         [
