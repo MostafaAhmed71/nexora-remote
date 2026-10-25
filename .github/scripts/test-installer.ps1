@@ -65,5 +65,21 @@ if (Get-Service NexoraRemote -ErrorAction SilentlyContinue) { throw 'Service rem
 if (Test-Path "$installRoot/Nexora.Remote.Agent.exe") { throw 'Executable remained after uninstall' }
 if (Test-Path $registryPath) { throw 'Installed Apps registration remained' }
 if (Test-Path "$dataRoot/upgrade-test-marker.txt") { throw 'Machine data remained after clean uninstall' }
-@{ installed=$true; automaticService=$true; serviceStartStop=$true; upgradePreservesMachineData=$true; upgradeFrom='0.2.0'; upgradeTo='0.3.0'; rollbackValidated=$false; uninstalled=$true; remoteDesktopTested=$false } | ConvertTo-Json | Set-Content 'artifacts/installer-smoke.json'
+# Independently prove fresh 0.3 installation after the upgraded install was removed.
+try {
+    $freshLog = Join-Path $logRoot 'installer-fresh03.log'
+    $fresh = Start-Process $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$installRoot`"","/LOG=`"$freshLog`"") -Wait -PassThru
+    if ($fresh.ExitCode -ne 0) { throw "Fresh 0.3 install exit $($fresh.ExitCode)" }
+    Wait-ServiceState 'Running'
+    if ((Get-ItemProperty $registryPath).DisplayVersion -ne '0.3.0') { throw 'Fresh version mismatch' }
+} finally {
+    if (Test-Path "$installRoot/unins000.exe") {
+        $freshRemoveLog = Join-Path $logRoot 'installer-fresh03-uninstall.log'
+        $freshRemove = Start-Process "$installRoot/unins000.exe" -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=`"$freshRemoveLog`"") -Wait -PassThru
+        if ($freshRemove.ExitCode -ne 0) { throw 'Fresh uninstall failed' }
+    }
+}
+if (Get-Service NexoraRemote -ErrorAction SilentlyContinue) { throw 'Fresh install service not removed' }
+if (Test-Path "$installRoot/Nexora.Remote.Agent.exe") { throw 'Fresh executable remained' }
+@{ installed=$true; fresh03Validated=$true; automaticService=$true; serviceStartStop=$true; upgradePreservesMachineData=$true; upgradeFrom='0.2.0'; upgradeTo='0.3.0'; rollbackValidated=$false; uninstalled=$true; remoteDesktopTested=$false } | ConvertTo-Json | Set-Content 'artifacts/installer-smoke.json'
 Write-Host 'Machine service install/start/stop/restart/upgrade/uninstall checks passed.'
