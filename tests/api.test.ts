@@ -333,6 +333,17 @@ describe("device enrollment and authorization", () => {
       "UPDATE auth_sessions SET expires_at=now()+interval '2 minutes' WHERE id_hash=$1",
       [digest(ownerCookie.split("=")[1])],
     );
+    const healthAck = new Promise<void>((resolve) => {
+      const listener = (data: any) => {
+        if (data.toString().includes("healthAck")) {
+          agent.off("message", listener);
+          resolve();
+        }
+      };
+      agent.on("message", listener);
+    });
+    agent.send(JSON.stringify({ type: "health", interactive: true }));
+    await healthAck;
     const auth = await call("/sessions", "POST", { deviceId, mode: "control" });
     expect(auth.statusCode).toBe(200);
     const sid = auth.json().id;

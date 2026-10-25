@@ -552,7 +552,15 @@ export async function createApp(o: Options) {
       ),
     );
     if (!d) throw fail(404, "Device not found");
-    return { ...d, online: agents.has(id) };
+    return {
+      ...d,
+      online: agents.has(id),
+      desktopStatus: !agents.has(id)
+        ? "offline"
+        : interactive.get(id) === true
+          ? "available"
+          : "unavailable",
+    };
   });
   app.patch("/api/devices/:id", async (req) => {
     const { org, u } = await scope(req, "devices");
@@ -588,7 +596,15 @@ export async function createApp(o: Options) {
           "SELECT id,name,os,agent_version,last_seen,revoked_at,group_id,capabilities FROM devices WHERE org_id=$1 ORDER BY name",
           [org],
         )
-      ).rows.map((d) => ({ ...d, online: agents.has(d.id) })),
+      ).rows.map((d) => ({
+        ...d,
+        online: agents.has(d.id),
+        desktopStatus: !agents.has(d.id)
+          ? "offline"
+          : interactive.get(d.id) === true
+            ? "available"
+            : "unavailable",
+      })),
     );
   });
   app.get("/api/groups", async (req) => {
@@ -1016,6 +1032,7 @@ export async function createApp(o: Options) {
           agents.get(id)?.terminate();
         }
         agents.set(id, ws);
+        interactive.set(id, false);
         await o.run(org, (db) =>
           db.query(
             "UPDATE devices SET last_seen=now() WHERE org_id=$1 AND id=$2",
@@ -1051,6 +1068,7 @@ export async function createApp(o: Options) {
                   typeof state.interactive === "boolean"
                 ) {
                   interactive.set(id, state.interactive);
+                  ws.send(JSON.stringify({ type: "healthAck" }));
                 }
                 if (state.type === "health")
                   for (const sid of sessionDevices.keys())

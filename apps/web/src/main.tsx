@@ -158,7 +158,15 @@ function Data({
                       ? r[c.key]
                         ? "متصل"
                         : "غير متصل"
-                      : String(r[c.key] ?? "—")}
+                      : c.key === "desktopStatus"
+                        ? ((
+                            {
+                              available: "متاح",
+                              unavailable: "لا توجد جلسة تفاعلية",
+                              offline: "غير متصل",
+                            } as Record<string, string>
+                          )[r[c.key]] ?? "غير معلوم")
+                        : String(r[c.key] ?? "—")}
                   </td>
                 ))}
               </tr>
@@ -422,6 +430,7 @@ function Dashboard() {
                   { key: "name", label: "الجهاز" },
                   { key: "os", label: "النظام" },
                   { key: "online", label: "الاتصال" },
+                  { key: "desktopStatus", label: "سطح المكتب" },
                   { key: "last_seen", label: "آخر ظهور" },
                 ]}
               />
@@ -437,6 +446,7 @@ function Dashboard() {
                   { key: "os", label: "النظام" },
                   { key: "agent_version", label: "Agent" },
                   { key: "online", label: "الحالة" },
+                  { key: "desktopStatus", label: "سطح المكتب" },
                   { key: "revoked_at", label: "إلغاء الثقة" },
                 ]}
               />
