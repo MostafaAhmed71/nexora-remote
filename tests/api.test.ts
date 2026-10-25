@@ -702,6 +702,10 @@ describe("MFA and recovery", () => {
     }
   });
   it("atomically replaces recovery-code sets under concurrent regeneration", async () => {
+    // Do not accidentally test the 30-second TOTP boundary while testing DB serialization.
+    const remaining = 30000 - (Date.now() % 30000);
+    if (remaining < 5000)
+      await new Promise((r) => setTimeout(r, remaining + 100));
     const row = await db.query("SELECT mfa_secret FROM users WHERE id=$1", [
       tech,
     ]);
