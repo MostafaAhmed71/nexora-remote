@@ -12,7 +12,7 @@ export async function api<T = any>(
     method,
     credentials: "same-origin",
     headers: {
-      "Content-Type": "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       "X-Organization-Id": organizationId,
     },
     body: body === undefined ? undefined : JSON.stringify(body),

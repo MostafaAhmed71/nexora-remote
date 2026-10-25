@@ -400,3 +400,44 @@ pre {
     flex-wrap: wrap;
   }
 }
+
+.remote-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+}
+.remote-toolbar label {
+  max-width: 180px;
+}
+.remote-screen {
+  overflow: auto;
+  max-height: 75vh;
+  background: #050a12;
+  margin: 20px 0;
+}
+.viewer canvas.fit {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  margin: 0;
+}
+.viewer canvas.actual {
+  width: auto;
+  height: auto;
+  max-width: none;
+  margin: 0;
+}
+.viewer:fullscreen {
+  overflow: auto;
+}
+.viewer textarea {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  max-width: 700px;
+}
+.remote-toolbar select,
+.remote-toolbar input {
+  color: #13213c;
+}

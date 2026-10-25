@@ -1,3 +1,4 @@
+import { DeviceAclEditor } from "./DeviceAclEditor";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -29,6 +30,9 @@ import {
 import { api, organizationId, setOrganization } from "./api";
 import { Viewer } from "./Viewer";
 import "./style.css";
+const resetToken = new URLSearchParams(location.search).get("token") ?? "";
+if (location.pathname === "/reset" && resetToken)
+  history.replaceState(null, "", "/reset");
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
@@ -39,7 +43,13 @@ function Form({
   label = "حفظ",
 }: {
   title: string;
-  fields: { name: string; label: string; type?: string; options?: string[] }[];
+  fields: {
+    name: string;
+    label: string;
+    type?: string;
+    defaultValue?: string;
+    options?: string[];
+  }[];
   onSubmit: (v: any) => Promise<any>;
   label?: string;
 }) {
@@ -77,8 +87,9 @@ function Form({
             </select>
           ) : (
             <input
-              required={f.name !== "otp"}
+              required={!["otp", "recoveryCode"].includes(f.name)}
               name={f.name}
+              defaultValue={f.defaultValue}
               type={f.type ?? "text"}
               autoComplete={
                 f.type === "password" ? "current-password" : undefined
@@ -198,7 +209,8 @@ function Dashboard() {
     [viewerMode, setViewerMode] = useState("view"),
     [notice, setNotice] = useState(""),
     [enrollment, setEnrollment] = useState<any>(null),
-    [mfa, setMfa] = useState<any>(null);
+    [mfa, setMfa] = useState<any>(null),
+    [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const client = useQueryClient(),
     location = useLocation(),
     navigate = useNavigate();
@@ -223,7 +235,11 @@ function Dashboard() {
           <Form
             title="إعادة تعيين كلمة المرور"
             fields={[
-              { name: "token", label: "رمز الاستعادة" },
+              {
+                name: "token",
+                label: "رمز الاستعادة",
+                defaultValue: resetToken,
+              },
               {
                 name: "password",
                 label: "كلمة المرور الجديدة (١٢ حرفًا على الأقل)",
@@ -248,6 +264,11 @@ function Dashboard() {
               { name: "email", label: "البريد الإلكتروني", type: "email" },
               { name: "password", label: "كلمة المرور", type: "password" },
               { name: "otp", label: "رمز MFA (إن كان مفعّلًا)" },
+              {
+                name: "recoveryCode",
+                label: "كود الاستعادة الاحتياطي (اختياري)",
+                type: "password",
+              },
             ]}
             onSubmit={async (v) => {
               await api("/auth/login", "POST", v);
@@ -436,6 +457,7 @@ function Dashboard() {
                   setViewer(s.id);
                 }}
               />
+              <DeviceAclEditor />
               <Form
                 title="إلغاء الثقة بالجهاز"
                 label="إلغاء الثقة وإنهاء الجلسات"
@@ -646,6 +668,34 @@ function Dashboard() {
                   </>
                 )}
               </div>
+              <Form
+                title="توليد أكواد استعادة MFA"
+                fields={[
+                  {
+                    name: "password",
+                    label: "كلمة المرور الحالية",
+                    type: "password",
+                  },
+                  { name: "otp", label: "رمز MFA الحالي" },
+                ]}
+                onSubmit={async (v) => {
+                  const result = await api(
+                    "/auth/mfa/recovery-codes",
+                    "POST",
+                    v,
+                  );
+                  setRecoveryCodes(result.codes);
+                }}
+              />
+              {recoveryCodes.length > 0 && (
+                <div className="card">
+                  <p>
+                    كل كود لمرة واحدة. احفظها بأمان؛ التوليد يلغي الأكواد
+                    السابقة.
+                  </p>
+                  <pre dir="ltr">{recoveryCodes.join("\n")}</pre>
+                </div>
+              )}
               <Data
                 path="/auth/sessions"
                 columns={[
