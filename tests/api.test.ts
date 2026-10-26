@@ -254,8 +254,12 @@ describe("device enrollment and authorization", () => {
     ).toBe(404);
   });
   it("proves device identity with one-time challenge", async () => {
-    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
-      .nonce;
+    const n = (
+      await call("/agent/challenge", "POST", {
+        deviceId,
+        organizationId: a,
+      })
+    ).json().nonce;
     const signature = createSign("SHA256")
       .update(n)
       .sign(key.privateKey, "base64");
@@ -285,8 +289,12 @@ describe("device enrollment and authorization", () => {
     expect(proof.statusCode).toBe(403);
   });
   it("denies forged device proof", async () => {
-    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
-      .nonce;
+    const n = (
+      await call("/agent/challenge", "POST", {
+        deviceId,
+        organizationId: a,
+      })
+    ).json().nonce;
     expect(
       (
         await call("/agent/prove", "POST", {
@@ -328,8 +336,12 @@ describe("device enrollment and authorization", () => {
     ).toBe(true));
   it("relays authorized frames/input, rejects ticket replay and stale in-flight input after viewer replacement", async () => {
     const { once } = await import("node:events");
-    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
-      .nonce;
+    const n = (
+      await call("/agent/challenge", "POST", {
+        deviceId,
+        organizationId: a,
+      })
+    ).json().nonce;
     const signature = createSign("SHA256")
       .update(n)
       .sign(key.privateKey, "base64");
@@ -648,8 +660,12 @@ describe("device enrollment and authorization", () => {
       (await call("/devices/" + deviceId, "DELETE", undefined, a, techCookie))
         .statusCode,
     ).toBe(200);
-    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
-      .nonce;
+    const n = (
+      await call("/agent/challenge", "POST", {
+        deviceId,
+        organizationId: a,
+      })
+    ).json().nonce;
     const signature = createSign("SHA256")
       .update(n)
       .sign(key.privateKey, "base64");
