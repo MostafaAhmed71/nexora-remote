@@ -830,7 +830,9 @@ export async function createApp(o: Options) {
     });
   });
   app.post("/api/agent/challenge", async (req) => {
-    const b = z.object({ deviceId: uuid, organizationId: uuid }).parse(req.body);
+    const b = z
+      .object({ deviceId: uuid, organizationId: uuid })
+      .parse(req.body);
     if (challenges.size > 10000) throw fail(429, "Try later");
     const n = token();
     challenges.set(n, {
