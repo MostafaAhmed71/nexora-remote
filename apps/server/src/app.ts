@@ -81,7 +81,10 @@ export async function createApp(o: Options) {
   const viewers = new Map<string, WebSocket>();
   const streamGates = new Map<string, StreamGate>();
   const sessionDevices = new Map<string, string>();
-  const challenges = new Map<string, { device: string; org: string; expires: number }>();
+  const challenges = new Map<
+    string,
+    { device: string; org: string; expires: number }
+  >();
   const tickets = new Map<
     string,
     { side: "agent" | "viewer"; id: string; expires: number; authHash?: string }
@@ -830,7 +833,11 @@ export async function createApp(o: Options) {
     const b = z.object({ deviceId: uuid, organizationId: uuid }).parse(req.body);
     if (challenges.size > 10000) throw fail(429, "Try later");
     const n = token();
-    challenges.set(n, { device: b.deviceId, org: b.organizationId, expires: Date.now() + 30000 });
+    challenges.set(n, {
+      device: b.deviceId,
+      org: b.organizationId,
+      expires: Date.now() + 30000,
+    });
     return { nonce: n };
   });
   app.post("/api/agent/prove", async (req) => {
@@ -844,7 +851,12 @@ export async function createApp(o: Options) {
       .parse(req.body);
     const n = challenges.get(b.nonce);
     challenges.delete(b.nonce);
-    if (!n || n.device !== b.deviceId || n.org !== b.organizationId || n.expires < Date.now())
+    if (
+      !n ||
+      n.device !== b.deviceId ||
+      n.org !== b.organizationId ||
+      n.expires < Date.now()
+    )
       throw fail(403, "Invalid challenge");
     const d = await o.run(b.organizationId, (db) =>
       one(
