@@ -254,7 +254,7 @@ describe("device enrollment and authorization", () => {
     ).toBe(404);
   });
   it("proves device identity with one-time challenge", async () => {
-    const n = (await call("/agent/challenge", "POST", { deviceId })).json()
+    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
       .nonce;
     const signature = createSign("SHA256")
       .update(n)
@@ -263,8 +263,29 @@ describe("device enrollment and authorization", () => {
     expect((await call("/agent/prove", "POST", payload)).statusCode).toBe(200);
     expect((await call("/agent/prove", "POST", payload)).statusCode).toBe(403);
   });
+  it("rejects device proof for a different organization", async () => {
+    const challenge = await call("/agent/challenge", "POST", {
+      deviceId,
+      organizationId: a,
+    });
+    expect(challenge.statusCode).toBe(200);
+
+    const nonce = challenge.json().nonce;
+    const signature = createSign("SHA256")
+      .update(nonce)
+      .sign(key.privateKey, "base64");
+
+    const proof = await call("/agent/prove", "POST", {
+      deviceId,
+      organizationId: b,
+      nonce,
+      signature,
+    });
+
+    expect(proof.statusCode).toBe(403);
+  });
   it("denies forged device proof", async () => {
-    const n = (await call("/agent/challenge", "POST", { deviceId })).json()
+    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
       .nonce;
     expect(
       (
@@ -307,7 +328,7 @@ describe("device enrollment and authorization", () => {
     ).toBe(true));
   it("relays authorized frames/input, rejects ticket replay and stale in-flight input after viewer replacement", async () => {
     const { once } = await import("node:events");
-    const n = (await call("/agent/challenge", "POST", { deviceId })).json()
+    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
       .nonce;
     const signature = createSign("SHA256")
       .update(n)
@@ -627,7 +648,7 @@ describe("device enrollment and authorization", () => {
       (await call("/devices/" + deviceId, "DELETE", undefined, a, techCookie))
         .statusCode,
     ).toBe(200);
-    const n = (await call("/agent/challenge", "POST", { deviceId })).json()
+    const n = (await call("/agent/challenge", "POST", { deviceId, organizationId: a })).json()
       .nonce;
     const signature = createSign("SHA256")
       .update(n)
