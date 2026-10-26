@@ -856,7 +856,9 @@ export async function createApp(o: Options) {
       n.device !== b.deviceId ||
       n.org !== b.organizationId ||
       n.expires < Date.now()
-    ) throw fail(403, "Invalid challenge");
+    ) {
+      throw fail(403, "Invalid challenge");
+    }
     const d = await o.run(b.organizationId, (db) =>
       one(
         db,
