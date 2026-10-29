@@ -100,7 +100,7 @@ test("viewer relays simulated frames, applies quality and Unicode input, then te
     await (
       await page.request.post("/api/agent/challenge", {
         headers,
-        data: { deviceId: device.id },
+        data: { deviceId: device.id, organizationId: org },
       })
     ).json()
   ).nonce;
