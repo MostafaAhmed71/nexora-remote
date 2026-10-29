@@ -320,7 +320,7 @@ function Dashboard() {
             onChange={(e) => {
               setOrganization(e.target.value);
               setOrg(e.target.value);
-              client.clear();
+              void client.invalidateQueries();
             }}
           >
             <option value="">اختر المؤسسة</option>
@@ -359,7 +359,7 @@ function Dashboard() {
               className="secondary"
               onClick={() => {
                 void api("/auth/logout", "POST", {}).then(() => {
-                  client.clear();
+                  void client.invalidateQueries();
                   navigate("/");
                 });
               }}

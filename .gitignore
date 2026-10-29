@@ -1,4 +1,5 @@
 node_modules/
+*.bak
 dist/
 .env
 .env.*
