@@ -18,6 +18,10 @@ try {
       (await readFile(
         "packages/database/migrations/003_device_operations.sql",
         "utf8",
+      )) +
+      (await readFile(
+        "packages/database/migrations/004_master_management.sql",
+        "utf8",
       )),
   );
   const a = randomUUID(),

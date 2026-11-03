@@ -20,6 +20,7 @@ public sealed class DesktopWorker : Form
                     {
                         switch (request.GetProperty("type").GetString())
                         {
+                            case "management": var managedIdentity = request.GetProperty("identity").Deserialize<Identity>()!; var managedResult = await desktop.Manage(request.GetProperty("signed").GetString()!, managedIdentity, request.GetProperty("nonce").GetString()!, stop.Token); return new { ok = true, payload = managedResult };
                             case "status": return new { ok = true, available = desktop.Available } as object;
                             case "grant": var identity = request.GetProperty("identity").Deserialize<Identity>()!; await desktop.Authorize(request.GetProperty("grant").GetString()!, identity, stop.Token); state.Text = "Authorized remote session active — visible and revocable"; return new { ok = true };
                             case "revoke": await desktop.Revoke(stop.Token); state.Text = "Session ended"; return new { ok = true };

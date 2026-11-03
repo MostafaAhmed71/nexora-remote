@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import { registerManagement } from "./management.js";
 import { StreamGate } from "./stream-gate.js";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
@@ -554,7 +555,10 @@ export async function createApp(o: Options) {
       frameTransport: "JPEG over WebSocket relay",
       passwordResetDelivery: !!o.deliverReset,
       serviceMode: false,
-      fileTransfer: false,
+      fileTransfer: true,
+      fileTransferMaxBytes: 10485760,
+      classroomManagement: true,
+      secureExamIsolation: false,
       clipboard: false,
     };
   });
@@ -1358,6 +1362,13 @@ export async function createApp(o: Options) {
         );
       }
     })().catch(() => ws.close(1008));
+  });
+  registerManagement(app, {
+    ...o,
+    scope,
+    deviceAllowed,
+    audit,
+    online: (id) => agents.has(id),
   });
   return app;
 }

@@ -1,5 +1,9 @@
 # NEXORA Remote
 
+## Unreleased local master-management additions
+
+The `/master` dashboard adds bulk grouping, time packages, timers, cooperative screen locking, room maps and consented file transfers (10 MiB per file). Apply migration 004 and use the updated Windows agent with explicit local management consent. Classroom profiles currently provide a guided app/site launcher, **not secure exam isolation or an OS-enforced allowlist**. See [the implementation and limits](docs/MASTER_MANAGEMENT_AR.md). The historical 0.3 CI evidence below does not validate these new changes.
+
 **0.3.0 engineering preview — Phase 3. Not approved for institutional use or sale.**
 
 Continue the existing private repository: https://github.com/MostafaAhmed71/nexora-remote . No VPS, public deployment, school device or production identity has been used. Large build outputs live in Actions Artifacts, not Git.

@@ -1,4 +1,5 @@
 import { DeviceAclEditor } from "./DeviceAclEditor";
+import { MasterConsole } from "./MasterConsole";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -118,7 +119,14 @@ function Data({
   const q = useQuery({
     queryKey: [organizationId, path],
     queryFn: () => api(path),
+    enabled: !!organizationId,
   });
+  if (!organizationId)
+    return (
+      <div className="card" role="status">
+        اختر المؤسسة من القائمة لعرض البيانات.
+      </div>
+    );
   if (q.isPending)
     return (
       <div className="card" role="status">
@@ -178,6 +186,7 @@ function Data({
   );
 }
 const nav = [
+  ["/master", "لوحة الماستر", Monitor],
   ["/", "نظرة عامة", LayoutDashboard],
   ["/devices", "الأجهزة", Monitor],
   ["/groups", "مجموعات الأجهزة", Layers],
@@ -384,6 +393,7 @@ function Dashboard() {
               {notice}
             </div>
           )}
+          {p === "/master" && <MasterConsole key={org} />}
           {!org && p !== "/organization" && (
             <div className="card">
               اختر مؤسسة من القائمة، أو أنشئ مؤسسة من صفحة المؤسسة.

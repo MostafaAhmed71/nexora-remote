@@ -441,3 +441,94 @@ pre {
 .remote-toolbar input {
   color: #13213c;
 }
+
+.master-console {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  min-width: 0;
+}
+.shell > main {
+  min-width: 0;
+}
+.master-console > *,
+.master-console .card {
+  min-width: 0;
+  max-width: 100%;
+}
+.master-console .grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.master-console fieldset {
+  min-inline-size: 0;
+  margin-top: 20px;
+  border: 1px solid #aab7cc;
+  padding: 16px;
+  border-radius: 12px;
+}
+.master-console textarea {
+  width: 100%;
+  min-height: 80px;
+  direction: ltr;
+}
+.master-detail {
+  display: block;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+}
+.room-map {
+  display: grid;
+  grid-template-columns: repeat(21, 145px);
+  grid-auto-rows: minmax(85px, auto);
+  gap: 10px;
+  overflow: auto;
+  max-height: 480px;
+  padding: 15px;
+  background: #eef2f8;
+  border-radius: 12px;
+  direction: ltr;
+  margin-bottom: 20px;
+}
+.room-map .seat {
+  color: #142137;
+  border: 2px solid #b7c5d7;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.seat small {
+  display: block;
+  margin-top: 8px;
+}
+.room-map .available {
+  background: #d5f6e4;
+}
+.room-map .locked {
+  background: #ffe0df;
+}
+.room-map .offline {
+  background: #e1e5eb;
+}
+.room-map .chosen {
+  outline: 3px solid #2257db;
+  outline-offset: 2px;
+}
+.file-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #b7c5d7;
+}
+@media (max-width: 700px) {
+  .master-console .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .master-console .card {
+    padding: 16px;
+  }
+  .master-console input,
+  .master-console select {
+    max-width: 100%;
+  }
+}

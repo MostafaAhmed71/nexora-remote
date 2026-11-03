@@ -6,8 +6,10 @@ namespace Nexora.Remote;
 
 public sealed record CaptureTiming(double CaptureMs = 0, double EncodeMs = 0);
 public interface IRemoteDesktop : IDisposable { bool Available { get; } CaptureTiming Timing { get; } Task Authorize(string signed, Identity identity, CancellationToken ct); Task Revoke(CancellationToken ct); Task Apply(JsonElement input, CancellationToken ct); Task<byte[]?> Capture(CaptureOptions options, CancellationToken ct); }
-public sealed class LocalDesktop : IRemoteDesktop
+public sealed class LocalDesktop : IRemoteDesktop, IManagedDesktop
 {
+    DesktopManagement? management;
+    public Task<JsonElement> Manage(string signed, Identity identity, string nonce, CancellationToken ct) => (management ??= new DesktopManagement()).Apply(signed, identity, nonce, ct);
     Bitmap? bitmap; public CaptureTiming Timing { get; private set; } = new(); Grant? grant; long sequence; public bool Enabled { get; set; } = true; public bool Available{get{NativeInput.FlushReleases();return Enabled&&NativeInput.NormalDesktop();}}
     public Task Authorize(string signed, Identity identity, CancellationToken ct) { NativeInput.ReleaseAll(); grant = GrantVerifier.Verify(signed, identity.ServerPublicKey, identity); sequence = 0; return Task.CompletedTask; }
     public Task Revoke(CancellationToken ct) { NativeInput.ReleaseAll(); grant = null; return Task.CompletedTask; }
@@ -25,7 +27,7 @@ public sealed class LocalDesktop : IRemoteDesktop
         var bytes = JpegEncoder.Encode(bitmap, options); Timing = new(capture, watch.Elapsed.TotalMilliseconds);
         return Task.FromResult<byte[]?>(bytes);
     }
-    public void Dispose() { NativeInput.ReleaseAll(); bitmap?.Dispose(); bitmap = null; }
+    public void Dispose() { management?.Dispose(); NativeInput.ReleaseAll(); bitmap?.Dispose(); bitmap = null; }
 
 }
 public static class JpegEncoder

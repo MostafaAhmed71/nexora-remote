@@ -5,8 +5,9 @@ using System.Diagnostics;
 using System.Text.Json;
 namespace Nexora.Remote;
 
-public sealed class SessionBroker : IRemoteDesktop
+public sealed class SessionBroker : IRemoteDesktop, IManagedDesktop
 {
+    public async Task<JsonElement> Manage(string signed, Identity identity, string nonce, CancellationToken ct) { var result = await Call(new { type = "management", signed, nonce, identity = new Identity(identity.Server, identity.OrganizationId, identity.DeviceId, "", identity.ServerPublicKey) }, ct); return result.GetProperty("payload").Clone(); }
     NamedPipeServerStream? pipe; Process? worker; readonly SemaphoreSlim rpc = new(1, 1); readonly CancellationTokenSource stop = new(); readonly Task manager; uint leasedSession; long generation; volatile bool available; public bool Available => available && SessionLifecycle.Usable(leasedSession, generation); public CaptureTiming Timing { get; private set; } = new();
     public SessionBroker() { manager = Task.Run(() => Manage(stop.Token)); }
     public static PipeSecurity Security(SecurityIdentifier user) { var acl = new PipeSecurity(); acl.SetAccessRuleProtection(true, false); acl.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid, null), PipeAccessRights.FullControl, AccessControlType.Deny)); acl.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), PipeAccessRights.FullControl, AccessControlType.Allow)); acl.AddAccessRule(new PipeAccessRule(user, PipeAccessRights.ReadWrite | PipeAccessRights.Synchronize, AccessControlType.Allow)); return acl; }

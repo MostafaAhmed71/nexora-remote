@@ -72,7 +72,7 @@ test("viewer relays simulated frames, applies quality and Unicode input, then te
     .selectOption({ label: "E2E Test Organization" });
   const org = await page.evaluate(() => sessionStorage.getItem("organization"));
   const headers = {
-    origin: "http://127.0.0.1:5173",
+    origin: new URL(page.url()).origin,
     "x-organization-id": org!,
   };
   const enrollment = await (
@@ -125,9 +125,12 @@ test("viewer relays simulated frames, applies quality and Unicode input, then te
     }),
     "base64",
   );
-  const agent = new WebSocket("ws://127.0.0.1:3000/api/socket", {
-    headers: { authorization: "Bearer " + proof.ticket },
-  });
+  const agent = new WebSocket(
+    new URL("/api/socket", page.url()).toString().replace(/^http/, "ws"),
+    {
+      headers: { authorization: "Bearer " + proof.ticket },
+    },
+  );
   const commands: any[] = [];
   let session = "";
   agent.on("message", (data) => {

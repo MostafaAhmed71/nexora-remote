@@ -7,12 +7,19 @@ import { createApp } from "../../apps/server/src/app.js";
 import type { DB } from "../../packages/database/index.js";
 if (process.env.NODE_ENV === "production")
   throw new Error("Test harness forbidden in production");
+const testOrigin = new URL(process.env.E2E_ORIGIN ?? "http://127.0.0.1:5173");
+if (testOrigin.protocol !== "http:" || testOrigin.hostname !== "127.0.0.1")
+  throw new Error("Test origin must be loopback HTTP");
 const db = new PGlite();
 await db.exec(
   (await readFile("packages/database/migrations/001_initial.sql", "utf8")) +
     (await readFile("packages/database/migrations/002_security.sql", "utf8")) +
     (await readFile(
       "packages/database/migrations/003_device_operations.sql",
+      "utf8",
+    )) +
+    (await readFile(
+      "packages/database/migrations/004_master_management.sql",
       "utf8",
     )),
 );
@@ -46,7 +53,7 @@ const app = await createApp({
       await tx.query("SELECT set_config('app.org_id',$1,true)", [org]);
       return fn(adapter(tx));
     }),
-  origin: "http://127.0.0.1:5173",
+  origin: testOrigin.origin,
   mfaKey: randomBytes(32),
   signingKey: k.privateKey,
   publicKey: k.publicKey,
@@ -58,7 +65,10 @@ app.post("/__test__/drop-agents", async (req) => {
     if (!ws.protocol) ws.terminate();
   return { ok: true };
 });
-await app.listen({ host: "127.0.0.1", port: 3000 });
+await app.listen({
+  host: "127.0.0.1",
+  port: Number(process.env.E2E_PORT ?? 3000),
+});
 for (const s of ["SIGINT", "SIGTERM"])
   process.on(s, () => {
     void app
